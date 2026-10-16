@@ -47,9 +47,19 @@
 
   <!-- Game screen -->
   <div id="game" class="screen hidden">
+    <aside id="place-panel">
+      <button class="panel-toggle" id="toggle-left" title="Collapse panel">◀</button>
+      <div id="place-empty">
+        <div class="pe-icon">🗺️</div>
+        <h3>Discover Kurdistan</h3>
+        <p>Click any square on the board to see a photo and the story of that place. The panel also follows each player as they land.</p>
+      </div>
+      <div id="place-content" class="hidden"></div>
+    </aside>
     <div id="board-frame"><div id="board"></div></div>
 
     <aside id="panel">
+      <button class="panel-toggle" id="toggle-right" title="Collapse panel">▶</button>
       <div class="panel-head">
         <div class="sun-emblem small"></div>
         <h2>Kurdistan Monopoly</h2>
@@ -91,6 +101,7 @@
   </div>
 
   <script src="data.js"></script>
+  <script src="images/manifest.js"></script>
   <script src="music/playlist.js"></script>
   <script src="audio.js"></script>
   <script src="game.js"></script>

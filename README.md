@@ -28,8 +28,16 @@ the tab and pick it up later from the start screen.
   roll. After your move the same click or key ends your turn.
 - Banners announce whose turn it is, the dice roll and where you landed; click a
   banner or press Space to skip it.
-- Click any square to see its deed card, including a **View on Google Maps**
-  button that opens the real place.
+- Click any square and the left panel shows photos and the story of that place,
+  its deed details, and buttons for Google Maps, Google Images and Wikipedia.
+  The panel also follows each player as they land. Photos come from the local
+  `images/` folder (freely licensed pictures from Wikimedia Commons ship with
+  the game, and you can add your own — see `images/README.md`), the text from
+  Wikipedia with built-in notes for offline play. Optionally, *photo source*
+  under the text lets you add a free Google Custom Search API key to show
+  Google Images results for places without local photos.
+- Both side panels fold away with the small arrow tab on their inner edge, so
+  the board can take the whole window; the choice is remembered.
 - The player bar under the side panel's video has Previous, Play/Pause and Next
   for whatever music is playing.
 
@@ -96,5 +104,6 @@ songs stream from YouTube or come from your own collection.
 - `data.js` – squares, rents, card text
 - `audio.js` – sound effects, built-in soundtracks, song library
 - `serve.py` / `play.command` – local no-cache web server and launcher
+- `images/` – photo library for the place panel, with `build.py` to rebuild or refetch it
 - `music/` – optional folder for your own audio files and the playlist helper
 - `game.js` – rules engine and UI

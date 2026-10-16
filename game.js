@@ -132,6 +132,13 @@
   function log(msg, hi = false) {
     state.log.push({ msg, hi });
     if (state.log.length > 300) state.log.shift();
+    renderLog();
+  }
+  function renderLog() {
+    const lg = $('#log');
+    if (!lg || !state) return;
+    lg.innerHTML = state.log.slice(-80).map((l) => `<div class="${l.hi ? 'hi' : ''}">${l.msg}</div>`).join('');
+    lg.scrollTop = lg.scrollHeight;
   }
   function save() { localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, moving: false })); }
   function stable() { render(); save(); }
@@ -375,6 +382,9 @@
       if (bannerSkip) { bannerSkip(); return; }
       primaryAction();
     });
+    $('#toggle-left').onclick = () => setPanel('left', !ui.leftCollapsed);
+    $('#toggle-right').onclick = () => setPanel('right', !ui.rightCollapsed);
+    applyPanels();
     const sfxBtn = $('#sfx-btn'), musicBtn = $('#music-btn');
     const mpToggle = $('#mp-toggle'), mpTitle = $('#mp-title');
     const paint = () => {
@@ -418,7 +428,188 @@
     };
   }
 
+  // ---------- Place panel (photo + story, left side) ----------
+  const wikiCache = JSON.parse(localStorage.getItem('kurdistan-monopoly-wiki') || '{}');
+  let placeToken = 0;
+  function placePanelVisible() { const p = $('#place-panel'); return p && getComputedStyle(p).display !== 'none'; }
+  // ---------- Collapsible side panels ----------
+  const UI_KEY = 'kurdistan-monopoly-ui';
+  const ui = Object.assign({ leftCollapsed: false, rightCollapsed: false }, JSON.parse(localStorage.getItem(UI_KEY) || '{}'));
+  function applyPanels() {
+    $('#game').classList.toggle('left-collapsed', ui.leftCollapsed);
+    $('#game').classList.toggle('right-collapsed', ui.rightCollapsed);
+    $('#toggle-left').textContent = ui.leftCollapsed ? '▶' : '◀';
+    $('#toggle-left').title = ui.leftCollapsed ? 'Show place panel' : 'Collapse place panel';
+    $('#toggle-right').textContent = ui.rightCollapsed ? '◀' : '▶';
+    $('#toggle-right').title = ui.rightCollapsed ? 'Show game panel' : 'Collapse game panel';
+    localStorage.setItem(UI_KEY, JSON.stringify(ui));
+  }
+  function setPanel(side, collapsed) { ui[side + 'Collapsed'] = collapsed; applyPanels(); }
+  async function fetchWiki(name) {
+    const title = WIKI_TITLES[name];
+    if (!title) return null;
+    if (wikiCache[title]) return wikiCache[title];
+    const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title.replace(/ /g, '_')));
+    if (!r.ok) throw new Error('wiki ' + r.status);
+    const j = await r.json();
+    const small = j.thumbnail && j.thumbnail.source ? j.thumbnail.source : null;
+    const large = small ? small.replace(/\/(\d+)px-/, (m, n) => (+n < 640 ? '/640px-' : m)) : null;
+    const original = j.originalimage && j.originalimage.source ? j.originalimage.source : null;
+    // try a 640px thumbnail first, then the API's own thumbnail, then the original file
+    const sources = [...new Set([large, small, original].filter(Boolean))];
+    const entry = { extract: j.extract || '', thumb: sources[0] || null, sources, page: (j.content_urls && j.content_urls.desktop && j.content_urls.desktop.page) || wikiUrl(name), title: j.title };
+    wikiCache[title] = entry;
+    try { localStorage.setItem('kurdistan-monopoly-wiki', JSON.stringify(wikiCache)); } catch (e) { /* storage full — fine */ }
+    return entry;
+  }
+  // Optional: photo gallery through Google's Custom Search JSON API (user supplies a free key)
+  const GOOGLE_KEY = 'kurdistan-monopoly-google';
+  const googleCfg = () => JSON.parse(localStorage.getItem(GOOGLE_KEY) || 'null');
+  const googleCache = JSON.parse(localStorage.getItem(GOOGLE_KEY + '-cache') || '{}');
+  async function fetchGooglePhotos(name) {
+    const cfg = googleCfg();
+    if (!cfg || !cfg.key || !cfg.cx) return null;
+    if (googleCache[name]) return googleCache[name];
+    const q = (MAP_PLACES[name] || name) + ' Kurdistan';
+    const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(cfg.key)}&cx=${encodeURIComponent(cfg.cx)}&searchType=image&num=6&safe=active&imgSize=large&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url);
+    if (!r.ok) { let msg = 'Google API error ' + r.status; try { const j = await r.json(); if (j.error && j.error.message) msg = j.error.message; } catch (e) { /* ignore */ } throw new Error(msg); }
+    const j = await r.json();
+    const photos = (j.items || []).map((it) => ({ src: it.link, thumb: it.image && it.image.thumbnailLink, page: it.image && it.image.contextLink, title: it.title })).filter((p) => p.src);
+    googleCache[name] = photos;
+    try { localStorage.setItem(GOOGLE_KEY + '-cache', JSON.stringify(googleCache)); } catch (e) { /* ignore */ }
+    return photos;
+  }
+  function openPhotoSettings() {
+    const cfg = googleCfg() || { key: '', cx: '' };
+    const card = openModal(`<h3>Photo source</h3>
+      <p>Photos come first from the local library in the <code>images/</code> folder (drop your own pictures there — see <code>images/README.md</code>), then from Wikipedia. To show a gallery of <b>Google Images</b> results for places without local photos, add a free Google API key — the game then uses Google's official Custom Search API (100 searches a day free). Your key stays in this browser.</p>
+      <ol style="font-size:13px;line-height:1.5;padding-left:20px">
+        <li>Go to <a href="https://programmablesearchengine.google.com/controlpanel/create" target="_blank" rel="noopener">programmablesearchengine.google.com</a>, create a search engine that searches the <b>entire web</b>, turn on <b>Image search</b>, and copy its <b>Search engine ID</b>.</li>
+        <li>Go to <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" rel="noopener">developers.google.com/custom-search</a>, click <b>Get a key</b>, and copy the <b>API key</b>.</li>
+        <li>Paste both below.</li>
+      </ol>
+      <label class="field"><span class="muted" style="font-size:12px">API key</span><input id="g-key" type="text" value="${cfg.key || ''}" placeholder="AIza…" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px"></label>
+      <label class="field"><span class="muted" style="font-size:12px">Search engine ID (cx)</span><input id="g-cx" type="text" value="${cfg.cx || ''}" placeholder="0123456789abcdef0:xyz" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px"></label>
+      <div class="modal-actions"><button class="btn" id="g-remove">Use Wikipedia only</button><button class="btn primary" id="g-save">Save</button></div>`, false, () => { closeModal(); });
+    card.querySelector('#g-save').onclick = () => {
+      const key = card.querySelector('#g-key').value.trim(), cx = card.querySelector('#g-cx').value.trim();
+      if (key && cx) localStorage.setItem(GOOGLE_KEY, JSON.stringify({ key, cx })); else localStorage.removeItem(GOOGLE_KEY);
+      for (const k of Object.keys(googleCache)) delete googleCache[k];
+      localStorage.removeItem(GOOGLE_KEY + '-cache');
+      closeModal();
+      if (lastPlace != null) showPlace(lastPlace);
+    };
+    card.querySelector('#g-remove').onclick = () => { localStorage.removeItem(GOOGLE_KEY); localStorage.removeItem(GOOGLE_KEY + '-cache'); closeModal(); if (lastPlace != null) showPlace(lastPlace); };
+  }
+  let lastPlace = null;
+
+  function showPlace(i) {
+    const s = SQUARES[i];
+    const token = ++placeToken;
+    lastPlace = i;
+    document.querySelectorAll('.sq.selected').forEach((e) => e.classList.remove('selected'));
+    const sqEl = document.querySelector(`.sq[data-i="${i}"]`); if (sqEl) sqEl.classList.add('selected');
+    const color = s.group ? GROUPS[s.group].color : s.type === 'railroad' ? '#333' : s.type === 'utility' ? '#777' : 'var(--yellow)';
+    const o = state.owners[i];
+    const region = s.region || (s.type === 'railroad' ? 'Border crossing' : s.type === 'utility' ? 'Utility' : 'Kurdistan');
+    let facts = '';
+    if (o) {
+      const ownerTxt = o.owner == null ? 'Unowned' : `${state.players[o.owner].token} ${state.players[o.owner].name}`;
+      const rentNow = o.owner == null ? '—' : fmt(rentFor(i, { dice: 7 }));
+      facts = `<div class="place-facts"><div class="fact">Price<b>${fmt(s.price)}</b></div><div class="fact">Owner<b>${ownerTxt}</b></div><div class="fact">Rent now<b>${rentNow}${s.type === 'utility' && o.owner != null ? ' <small>(roll of 7)</small>' : ''}</b></div><div class="fact">Status<b>${o.mortgaged ? 'Mortgaged' : o.houses === 5 ? 'Hotel' : o.houses ? o.houses + ' house' + (o.houses > 1 ? 's' : '') : 'No buildings'}</b></div></div>`;
+    }
+    const wiki = wikiUrl(s.name);
+    $('#place-empty').classList.add('hidden');
+    const el = $('#place-content');
+    el.classList.remove('hidden');
+    el.innerHTML = `
+      <div class="place-photo"><div class="ph-fallback"><span>Loading photo…</span></div><img alt="${s.name}"><div class="ph-region">${region}</div></div>
+      <div class="place-head"><div class="ph-bar" style="--c:${color}"></div><div><h2>${s.name}</h2><div class="ph-k">${s.kurdish || ''}</div></div></div>
+      <div class="place-about loading">${ABOUT[s.name] || ''}</div>
+      <div class="place-source"></div>
+      ${facts}
+      <div class="place-links">${mapUrl(s.name) ? `<a class="btn" href="${mapUrl(s.name)}" target="_blank" rel="noopener">📍 Google Maps</a>` : ''}<a class="btn" href="${googleImagesUrl(s.name)}" target="_blank" rel="noopener">🖼 Google Images</a>${wiki ? `<a class="btn" href="${wiki}" target="_blank" rel="noopener">📖 Wikipedia</a>` : ''}</div>
+      ${o ? `<div class="place-deed">${deedHtml(i)}</div>` : ''}`;
+    el.scrollTop = 0;
+    $('#place-panel').scrollTop = 0;
+    const img = el.querySelector('.place-photo img');
+    const fb = el.querySelector('.ph-fallback');
+    const settingsLink = ` · <a href="#" class="photo-settings">photo source</a>`;
+    const setPhoto = (src, onFail) => {
+      img.classList.remove('loaded');
+      img.onload = () => { img.classList.add('loaded'); if (fb.isConnected) fb.remove(); };
+      img.onerror = onFail;
+      img.src = src;
+    };
+    let googleShown = false, localShown = false;
+    const useGoogle = !!googleCfg();
+    const wikiPromise = fetchWiki(s.name);
+
+    // Gallery: main photo + thumbnail strip + caption linking to the source
+    const showGallery = (photos) => {
+      if (photos.length > 1) {
+        const strip = document.createElement('div');
+        strip.className = 'ph-thumbs';
+        strip.innerHTML = photos.map((p, k) => `<img src="${p.thumb || p.src}" data-k="${k}" class="${k === 0 ? 'on' : ''}" alt="">`).join('');
+        el.querySelector('.place-photo').appendChild(strip);
+        strip.onclick = (e) => { const t = e.target.closest('img'); if (t) pick(+t.dataset.k); };
+        var thumbs = strip;
+      }
+      const cap = document.createElement('a');
+      cap.className = 'ph-caption'; cap.target = '_blank'; cap.rel = 'noopener';
+      el.querySelector('.place-photo').appendChild(cap);
+      const pick = (k) => {
+        const p = photos[k];
+        if (thumbs) thumbs.querySelectorAll('img').forEach((t) => t.classList.toggle('on', +t.dataset.k === k));
+        cap.textContent = p.caption || p.title || 'Source'; cap.href = p.page || p.src; cap.title = p.caption || p.title || '';
+        if (!p.page) cap.removeAttribute('href');
+        setPhoto(p.src, () => { if (k + 1 < photos.length) pick(k + 1); else fb.innerHTML = '<span>Photos could not be loaded</span>'; });
+      };
+      pick(0);
+    };
+
+    // 1) Local photos from the images/ folder win (work offline)
+    const local = (window.LOCAL_IMAGES || {})[s.name];
+    if (local && local.length) {
+      localShown = true;
+      showGallery(local.map((p) => ({ src: p.file, thumb: p.file, page: p.source, title: p.title, caption: p.author ? `${p.author}${p.license ? ' · ' + p.license : ''}` : p.title })));
+    }
+
+    // 2) Optional Google gallery (official API, user key)
+    const googlePromise = useGoogle && !localShown ? fetchGooglePhotos(s.name).then((photos) => {
+      if (token !== placeToken || !photos || !photos.length) return;
+      googleShown = true;
+      showGallery(photos);
+    }).catch((err) => { if (token === placeToken) el.querySelector('.place-source').insertAdjacentHTML('beforeend', `<div class="muted" style="color:var(--red)">Google photos: ${err.message}. Showing Wikipedia instead.</div>`); }) : Promise.resolve();
+
+    Promise.all([wikiPromise.catch(() => null), googlePromise]).then(([w]) => {
+      if (token !== placeToken) return;
+      const about = el.querySelector('.place-about');
+      about.classList.remove('loading');
+      const src = el.querySelector('.place-source');
+      if (w && w.extract) about.textContent = w.extract;
+      if (localShown) {
+        src.insertAdjacentHTML('afterbegin', `Photos from the local library (see <code>images/</code>)${w ? ` · text from <a href="${w.page}" target="_blank" rel="noopener">Wikipedia</a> (CC BY-SA)` : ''}${settingsLink}`);
+      } else if (googleShown) {
+        src.insertAdjacentHTML('afterbegin', `Photos via Google Images${w ? ` · text from <a href="${w.page}" target="_blank" rel="noopener">Wikipedia</a> (CC BY-SA)` : ''}${settingsLink}`);
+      } else if (w) {
+        src.insertAdjacentHTML('afterbegin', `Text${w.thumb ? ' & photo' : ''} from <a href="${w.page}" target="_blank" rel="noopener">Wikipedia</a> · CC BY-SA${settingsLink}`);
+        if (w.thumb) {
+          const srcs = w.sources || [w.thumb];
+          const tryAt = (k) => { if (k >= srcs.length) { fb.innerHTML = '<span>Photo unavailable</span>'; return; } setPhoto(srcs[k], () => tryAt(k + 1)); };
+          tryAt(0);
+        } else fb.innerHTML = '<span>No photo on Wikipedia for this place</span>';
+      } else {
+        src.insertAdjacentHTML('afterbegin', `Offline — showing built-in notes${settingsLink}`);
+        fb.innerHTML = '<span>Photo needs an internet connection</span>';
+      }
+      const sl = el.querySelector('.photo-settings'); if (sl) sl.onclick = (e) => { e.preventDefault(); openPhotoSettings(); };
+    });
+  }
+
   function showSquareInfo(i) {
+    if (placePanelVisible()) { if (ui.leftCollapsed) setPanel('left', false); showPlace(i); return; }
     if (busy && !$('#modal').classList.contains('hidden')) return;
     const s = SQUARES[i];
     if (ownable(i)) return notify(s.name, deedHtml(i), 'Close');
@@ -472,6 +663,9 @@
     dice.classList.toggle('endable', canEnd);
     dice.title = canRoll ? 'Click to roll (or press Space)' : canEnd ? 'Click to end turn (or press Space)' : '';
     $('#dice-hint').textContent = canRoll ? (cur().inJail ? 'Click to roll for doubles · Space' : 'Click to roll · Space') : canEnd ? `Click to end ${cur().name}'s turn · Space` : '';
+
+    // the game panel must be visible when a decision needs its buttons
+    if (ui.rightCollapsed && (state.debt || (state.phase === 'roll' && cur().inJail) || state.phase === 'over')) setPanel('right', false);
 
     // turn box
     const p = cur();
@@ -539,10 +733,7 @@
       </div>`;
     }).join('');
 
-    // log
-    const lg = $('#log');
-    lg.innerHTML = state.log.slice(-80).map((l) => `<div class="${l.hi ? 'hi' : ''}">${l.msg}</div>`).join('');
-    lg.scrollTop = lg.scrollHeight;
+    renderLog();
   }
 
   function setBusy(v) { busy = v; render(); }
@@ -757,6 +948,7 @@
   async function landOn(i, opts = {}) {
     const p = cur(), pi = state.turn, s = SQUARES[i];
     log(`${p.name} lands on ${s.name}.`);
+    if (placePanelVisible()) showPlace(i);
     switch (s.type) {
       case 'property': case 'railroad': case 'utility': {
         const o = state.owners[i];

@@ -85,6 +85,60 @@ const MAP_PLACES = {
 };
 const mapUrl = (name) => MAP_PLACES[name] ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(MAP_PLACES[name]) : null;
 
+// Wikipedia article for each square (photo + summary are fetched live, CC BY-SA)
+const WIKI_TITLES = {
+  'Halabja': 'Halabja', 'Kobani': 'Kobanî', 'Afrin': 'Afrin, Syria', 'Amuda': 'Amuda', 'Qamishli': 'Qamishli',
+  'Mahabad': 'Mahabad', 'Saqqez': 'Saqqez', 'Ilam': 'Ilam, Iran', 'Hakkari': 'Hakkâri (city)', 'Mardin': 'Mardin', 'Van': 'Van, Turkey',
+  'Zakho': 'Zakho', 'Amedi': 'Amadiya', 'Duhok': 'Duhok', 'Urmia': 'Urmia', 'Kermanshah': 'Kermanshah', 'Sanandaj': 'Sanandaj',
+  'Hasakah': 'Al-Hasakah', 'Kirkuk': 'Kirkuk', 'Sulaymaniyah': 'Sulaymaniyah', 'Diyarbakir': 'Diyarbakır', 'Erbil': 'Erbil',
+  'Ibrahim Khalil': 'Iraq–Turkey border', 'Semalka': 'Semalka Border Crossing', 'Haji Omaran': 'Haji Omaran', 'Bashmaq': 'Iran–Iraq border',
+  'Dukan Dam Power': 'Dukan Dam', 'Tigris Waterworks': 'Tigris',
+  'Jail': 'Amna Suraka', 'Free Parking': 'Mount Judi', 'GO': 'Kurdistan', 'Newroz': 'Newroz as celebrated by Kurds',
+  'Dîwan': 'Kurdish culture', 'Go To Jail': 'Peshmerga', 'Income Tax': 'Kurdistan Region', 'Luxury Tax': 'Kurdish rugs',
+};
+
+// Short offline blurbs, shown until (or instead of) the Wikipedia summary
+const ABOUT = {
+  'Halabja': 'A city in the Kurdistan Region of Iraq near the Iranian border, famous for its pomegranates and remembered for the 1988 chemical attack. It is now a provincial capital with memorials and lively bazaars.',
+  'Kobani': 'A Kurdish border town in Rojava, northern Syria, that became a symbol of resistance during the 2014–15 siege. Its name means "company" in Kurdish, after the railway company that founded it.',
+  'Afrin': 'A city and olive-growing district in the hills of north-western Syria. Afrin was long one of the greenest, most peaceful corners of Rojava, dotted with olive groves and ancient sites.',
+  'Amuda': 'A small town in Rojava close to the Turkish border, known for poets, musicians and its role in Kurdish cultural life. A cinema fire in 1960 is one of the darkest chapters in its history.',
+  'Qamishli': 'The largest city in Rojava and its de facto capital, right on the Turkish border opposite Nusaybin. Kurds, Assyrians, Arabs and Armenians share its streets and cuisine.',
+  'Mahabad': 'A city in Iranian Kurdistan and the capital of the short-lived Republic of Mahabad in 1946, the first modern Kurdish state. Its central square and bazaar remain a point of Kurdish pride.',
+  'Saqqez': 'A city in Kurdistan Province, Iran, set in the valleys of the western Zagros. Saqqez is known for its ancient history, its Kurdish dialects and mountain scenery.',
+  'Ilam': 'The capital of Ilam Province in western Iran, nestled in oak-covered Zagros foothills. Its people are mostly Kurdish speakers of the Feyli and Kalhor communities.',
+  'Hakkari': 'Colemêrg in Kurdish, a mountain town in Turkey\'s far south-east where the borders of Turkey, Iraq and Iran meet. It is ringed by some of the highest peaks in Kurdistan.',
+  'Mardin': 'A hilltop old city of honey-coloured stone overlooking the Mesopotamian plain. Mardin\'s churches, mosques and madrasas reflect centuries of Kurdish, Arab, Assyrian and Armenian life.',
+  'Van': 'Wan in Kurdish, a city on the eastern shore of Lake Van, the largest lake in Turkey. It is home to the ancient Urartian citadel, Van cats and a famous breakfast culture.',
+  'Zakho': 'A city on the Khabur river at the northern tip of the Kurdistan Region of Iraq, close to the Turkish border. Its ancient Delal Bridge is one of the most photographed sights in Kurdistan.',
+  'Amedi': 'An ancient town perched on a flat-topped mesa in the Duhok mountains, reached by a single road. Amedi was the seat of the Bahdinan emirate for centuries.',
+  'Duhok': 'A city in a mountain valley in the north of the Kurdistan Region of Iraq, beside the Duhok Dam lake. It is known for its universities, bazaar and the nearby Gali Ali Beg gorge.',
+  'Urmia': 'Wirmê in Kurdish, a city in north-western Iran near the salt lake of the same name. It has long been shared by Kurds, Azeris and Assyrians.',
+  'Kermanshah': 'Kirmaşan in Kurdish, one of the largest Kurdish-majority cities, in western Iran. The Sasanian rock reliefs at Taq-e Bostan and the Bisotun inscription are on its doorstep.',
+  'Sanandaj': 'Sine in Kurdish, the capital of Iran\'s Kurdistan Province and a UNESCO Creative City of Music. It is celebrated for its musicians, carpets and old houses.',
+  'Hasakah': 'Hesekê in Kurdish, a city on the Khabur river in north-eastern Syria and the capital of its governorate. Its surrounding plain is Syria\'s breadbasket.',
+  'Kirkuk': 'Kerkûk in Kurdish, an oil-rich city in northern Iraq with an ancient citadel and a mix of Kurds, Turkmen, Arabs and Assyrians. Its status is one of the most debated questions in Iraq.',
+  'Sulaymaniyah': 'Silêmanî in Kurdish, founded in 1784 and regarded as the cultural capital of the Kurdistan Region of Iraq. It is known for poets, cafés, universities and liberal spirit.',
+  'Diyarbakir': 'Amed in Kurdish, the largest Kurdish-majority city, on the banks of the Tigris in south-eastern Turkey. Its black basalt city walls and Hevsel Gardens are a UNESCO World Heritage Site.',
+  'Erbil': 'Hewlêr in Kurdish, the capital of the Kurdistan Region of Iraq. Its citadel, a UNESCO World Heritage Site, has been inhabited for thousands of years, making Erbil one of the oldest continuously settled cities on earth.',
+  'Ibrahim Khalil': 'The main border crossing between the Kurdistan Region of Iraq and Turkey, just outside Zakho. Thousands of trucks and travellers pass through every day.',
+  'Semalka': 'A pontoon-bridge crossing over the Tigris linking Rojava in Syria with the Kurdistan Region of Iraq near Faysh Khabur.',
+  'Haji Omaran': 'A high mountain pass and border crossing between the Kurdistan Region of Iraq and Iran, east of Erbil, famous for its snowy winters.',
+  'Bashmaq': 'A border crossing near Penjwen linking Sulaymaniyah with Iranian Kurdistan around Marivan.',
+  'Dukan Dam Power': 'A concrete arch dam on the Lesser Zab river north-west of Sulaymaniyah, creating Lake Dukan and supplying hydroelectric power and irrigation.',
+  'Tigris Waterworks': 'The great river of Mesopotamia, flowing from the mountains of Kurdistan past Amed and Mosul to the Gulf. The Khabur and Zab rivers of Kurdistan feed it.',
+  'Jail': 'Amna Suraka, the former Baathist security headquarters in Sulaymaniyah, is now a museum remembering the victims of the Anfal campaign and the Kurdish struggle.',
+  'Free Parking': 'Mount Judi (Cûdî) in Şırnak province, where many traditions place the landing of Noah\'s Ark — a favourite place for Newroz picnics.',
+  'GO': 'Kurdistan is the mountainous homeland of the Kurds, spanning parts of Iraq, Syria, Iran and Turkey. Dest pê bike — let\'s begin!',
+  'Newroz': 'Newroz, the Kurdish new year on 21 March, is celebrated with bonfires, dancing and picnics. It recalls the legend of Kawa the blacksmith who defeated the tyrant Zuhak.',
+  'Dîwan': 'The dîwan is the traditional gathering room where guests are received, tea is poured and stories, poems and songs are shared.',
+  'Go To Jail': 'Peshmerga, "those who face death", are the military forces of the Kurdistan Region of Iraq.',
+  'Income Tax': 'The Kurdistan Region of Iraq is an autonomous region with its own parliament and government in Erbil.',
+  'Luxury Tax': 'Kurdish rugs and kilims, woven with bold geometric motifs, are among the most prized textiles of the region.',
+};
+const googleImagesUrl = (name) => 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent((MAP_PLACES[name] || name) + ' Kurdistan');
+const wikiUrl = (name) => WIKI_TITLES[name] ? 'https://en.wikipedia.org/wiki/' + encodeURIComponent(WIKI_TITLES[name].replace(/ /g, '_')) : null;
+
 const IDX = {};
 SQUARES.forEach((s, i) => { if (s.name) IDX[s.name] = i; });
 
