@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kurdistan Monopoly</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Setup screen -->
+  <div id="setup" class="screen">
+    <div class="setup-card">
+      <div class="kilim-strip top"></div>
+      <div class="sun-emblem big"></div>
+      <h1>Kurdistan Monopoly</h1>
+      <p class="tagline">Buy, build and trade your way across Bashur, Rojava, Rojhelat and Bakur.</p>
+
+      <div id="resume-box" class="hidden">
+        <button id="resume-btn" class="btn primary">Resume saved game</button>
+        <span class="muted">or start a new one below</span>
+      </div>
+
+      <div class="field">
+        <label>Players</label>
+        <div class="seg" id="player-count">
+          <button data-n="2">2</button>
+          <button data-n="3" class="active">3</button>
+          <button data-n="4">4</button>
+          <button data-n="5">5</button>
+          <button data-n="6">6</button>
+        </div>
+      </div>
+
+      <div id="player-rows"></div>
+
+      <div class="field row">
+        <label><input type="checkbox" id="opt-auction" checked> Auction declined properties</label>
+        <label><input type="checkbox" id="opt-parking"> Taxes and fines go to Free Parking</label>
+      </div>
+
+      <button id="start-btn" class="btn primary large">Start Game</button>
+      <p class="muted" style="margin:10px 0 0">Sound and music play once the game starts. Toggle them with 🔊 and 🎵 in the side panel.</p>
+      <div class="kilim-strip bottom"></div>
+    </div>
+  </div>
+
+  <!-- Game screen -->
+  <div id="game" class="screen hidden">
+    <div id="board-frame"><div id="board"></div></div>
+
+    <aside id="panel">
+      <div class="panel-head">
+        <div class="sun-emblem small"></div>
+        <h2>Kurdistan Monopoly</h2>
+        <div class="audio-btns">
+          <button id="sfx-btn" class="btn ghost small" title="Sound effects">🔊</button>
+          <button id="music-btn" class="btn ghost small" title="Music">🎵</button>
+        </div>
+      </div>
+      <div class="kilim-strip"></div>
+
+      <div id="turn-box"></div>
+
+      <div id="actions" class="actions"></div>
+
+      <div id="players"></div>
+
+      <div id="log-wrap">
+        <div class="log-title">Game log</div>
+        <div id="log"></div>
+      </div>
+
+      <div class="panel-foot">
+        <button id="new-game-btn" class="btn ghost small">New game</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="hidden">
+    <div id="modal-card"></div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
