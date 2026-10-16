@@ -112,11 +112,12 @@
     return a;
   }
 
-  function startGameScreen() {
+  async function startGameScreen() {
     $('#setup').classList.add('hidden');
     $('#game').classList.remove('hidden');
     buildBoard();
     stable();
+    if (state.phase === 'roll' && !state.debt) { setBusy(true); await turnBanner(cur()); setBusy(false); }
   }
 
   // =====================================================================
@@ -132,7 +133,7 @@
     state.log.push({ msg, hi });
     if (state.log.length > 300) state.log.shift();
   }
-  function save() { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+  function save() { localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, moving: false })); }
   function stable() { render(); save(); }
 
   function groupSquares(group) {
@@ -216,6 +217,59 @@
     });
   }
   const notify = (title, body, label = 'OK') => ask(title, body, [{ label, value: true, cls: 'primary' }]);
+
+  // ---------- On-board banners & toasts ----------
+  const STEP_MS = 260;
+  let bannerSkip = null;
+  function showBanner(html, ms, cls = '') {
+    const el = $('#banner');
+    el.className = `show ${cls}`;
+    el.innerHTML = html;
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => { if (done) return; done = true; bannerSkip = null; el.classList.remove('show'); setTimeout(resolve, 180); };
+      bannerSkip = finish;
+      el.onclick = finish;
+      setTimeout(finish, ms);
+    });
+  }
+  let toastTimer = null;
+  function toast(html, ms = 1400) {
+    const el = $('#toast');
+    el.innerHTML = html;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+  }
+  const dieHtml = (v) => `<div class="die" data-v="${v}">${'<span></span>'.repeat(9)}</div>`;
+  function turnBanner(p) {
+    return showBanner(`<div class="b-token" style="--pc:${p.color}">${p.token}</div><div class="b-title">${p.name}'s turn</div><div class="b-sub">${p.inJail ? 'In jail — roll doubles, pay the fine or use a card' : 'Click the dice to roll'}</div>`, 1300, 'turn');
+  }
+  function diceBanner(p) {
+    const [a, b] = state.dice;
+    return showBanner(`<div class="b-sub">${p.token} ${p.name} rolls</div><div class="b-dice">${dieHtml(a)}${dieHtml(b)}</div><div class="b-title">${a + b}</div>${a === b ? '<div class="b-sub b-hot">Doubles! Roll again after this move</div>' : ''}`, 1150, 'dice');
+  }
+  function landingBanner(p, i) {
+    const s = SQUARES[i];
+    const color = s.group ? GROUPS[s.group].color : s.type === 'railroad' ? '#333' : s.type === 'utility' ? '#777' : 'var(--yellow)';
+    const o = state.owners[i];
+    let note = '';
+    if (o) note = o.owner == null ? `For sale · ${fmt(s.price)}` : o.owner === state.turn ? 'Your own property' : `Owned by ${state.players[o.owner].token} ${state.players[o.owner].name}${o.mortgaged ? ' · mortgaged' : ''}`;
+    else if (s.type === 'tax') note = `Pay ${fmt(s.amount)}`;
+    else if (s.type === 'chance') note = 'Draw a Newroz card';
+    else if (s.type === 'chest') note = 'Draw a Dîwan card';
+    else if (s.type === 'gotojail') note = 'Straight to jail!';
+    else if (s.type === 'parking') note = state.opts.parking && state.pot ? `Collect the ${fmt(state.pot)} pot` : 'Free rest';
+    else if (s.type === 'jail') note = 'Just visiting';
+    else if (s.type === 'go') note = `Collect ${fmt(GO_SALARY)}`;
+    return showBanner(`<div class="b-sub">${p.token} ${p.name} lands on</div><div class="b-title" style="color:${color === 'var(--yellow)' ? '#fff' : '#fff'}"><span class="b-swatch" style="background:${color}"></span>${s.name}</div><div class="b-sub">${s.kurdish && s.type === 'property' ? s.kurdish + ' · ' : ''}${note}</div>`, 1000, 'land');
+  }
+  function flashSquare(i, cls, ms) {
+    const el = document.querySelector(`.sq[data-i="${i}"]`);
+    if (!el) return;
+    el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), ms);
+  }
 
   function deedHtml(i) {
     const s = SQUARES[i], o = state.owners[i];
@@ -302,6 +356,8 @@
       </div>
       <div id="dice"><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div></div>`;
     board.appendChild(center);
+    const banner = document.createElement('div'); banner.id = 'banner'; board.appendChild(banner);
+    const toastEl = document.createElement('div'); toastEl.id = 'toast'; board.appendChild(toastEl);
     const diceEl = $('#dice');
     diceEl.title = 'Click to roll';
     diceEl.onclick = (e) => { e.stopPropagation(); if (!busy && !state.debt && state.phase === 'roll') rollDice(); };
@@ -382,7 +438,7 @@
       const tokens = state.players
         .map((p, pi) => ({ p, pi }))
         .filter(({ p }) => !p.bankrupt && p.pos === i)
-        .map(({ p, pi }) => `<div class="token ${pi === state.turn ? 'active' : ''}" style="--pc:${p.color}" title="${p.name}">${p.token}</div>`)
+        .map(({ p, pi }) => `<div class="token ${pi === state.turn ? 'active' : ''} ${pi === state.turn && state.moving ? 'moving' : ''}" style="--pc:${p.color}" title="${p.name}">${p.token}</div>`)
         .join('');
       el.querySelector('.tokens').innerHTML = tokens;
     });
@@ -509,6 +565,7 @@
     const isDouble = state.dice[0] === state.dice[1];
     render();
     log(`${p.name} rolls ${state.dice[0]} + ${state.dice[1]} = ${diceTotal()}${isDouble ? ' (doubles!)' : ''}.`);
+    await diceBanner(p);
 
     if (p.inJail) {
       if (isDouble) {
@@ -532,6 +589,7 @@
           if (!state.debt) state.phase = 'end';
         } else {
           log(`${p.name} stays in jail.`);
+          toast(`🔒 No doubles — ${p.name} stays in jail (attempt ${p.jailTurns} of 3)`);
           state.phase = 'end';
         }
       }
@@ -543,6 +601,7 @@
       state.doubles++;
       if (state.doubles === 3) {
         log(`${p.name} rolled doubles three times — straight to jail!`, true);
+        await showBanner(`<div class="b-token">👮</div><div class="b-title">Three doubles!</div><div class="b-sub">${p.name} goes straight to jail</div>`, 1300, 'jail');
         await sendToJail(state.turn);
         finishAction();
         return;
@@ -555,6 +614,7 @@
     await landOn(p.pos);
     if (!state.debt && !p.inJail) state.phase = isDouble ? 'roll' : 'end';
     else if (!state.debt) state.phase = 'end';
+    if (state.phase === 'roll' && !state.debt) toast(`🎲 Doubles — ${p.name} rolls again`);
     finishAction();
   }
 
@@ -599,12 +659,15 @@
     stable();
   }
 
-  function endTurn() {
+  async function endTurn() {
     if (busy || state.phase !== 'end' || state.debt) return;
     state.doubles = 0;
     nextPlayer();
     log(`— ${cur().name}'s turn —`, true);
     stable();
+    setBusy(true);
+    await turnBanner(cur());
+    setBusy(false);
   }
 
   function nextPlayer() {
@@ -619,6 +682,7 @@
 
   async function moveBy(n) {
     const p = cur();
+    state.moving = true;
     for (let k = 0; k < n; k++) {
       p.pos = (p.pos + 1) % 40;
       Audio_.play('step');
@@ -626,11 +690,16 @@
         p.money += GO_SALARY;
         Audio_.play('coin');
         log(`${p.name} passes GO and collects ${fmt(GO_SALARY)}.`);
+        toast(`➜ ${p.name} passes GO · <b>+${fmt(GO_SALARY)}</b>`);
       }
       render();
-      await sleep(110);
+      flashSquare(p.pos, 'trail', 700);
+      await sleep(STEP_MS);
     }
-    await sleep(150);
+    state.moving = false;
+    render();
+    flashSquare(p.pos, 'landed', 2600);
+    await landingBanner(p, p.pos);
   }
   async function moveTo(target) {
     const p = cur();
@@ -777,7 +846,12 @@
 
     switch (card.action) {
       case 'moveTo': await moveTo(card.target); return landOn(p.pos);
-      case 'moveBack': p.pos = (p.pos - card.amount + 40) % 40; render(); await sleep(200); return landOn(p.pos);
+      case 'moveBack': {
+        for (let k = 0; k < card.amount; k++) { p.pos = (p.pos - 1 + 40) % 40; Audio_.play('step'); render(); flashSquare(p.pos, 'trail', 700); await sleep(STEP_MS); }
+        flashSquare(p.pos, 'landed', 2600);
+        await landingBanner(p, p.pos);
+        return landOn(p.pos);
+      }
       case 'goToJail': return sendToJail(pi);
       case 'collect': p.money += card.amount; Audio_.play('cash'); return;
       case 'pay': if (charge(pi, card.amount, null, { toPot: true })) Audio_.play('pay'); return;
@@ -1072,6 +1146,9 @@
     if (alive().length > 1) {
       nextPlayer();
       log(`— ${cur().name}'s turn —`, true);
+      stable(); // persist the bankruptcy before the hand-off banner
+      setBusy(true);
+      await turnBanner(cur());
     }
     finishAction();
   }
