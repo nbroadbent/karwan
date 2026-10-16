@@ -68,6 +68,23 @@ const SQUARES = [
   prop('Erbil', 'Hewlêr', 'Bashur · Iraq', 'darkblue', 400, [50, 200, 600, 1400, 1700, 2000], 200),
 ];
 
+// Where each place is, for the "View on Google Maps" button on its card.
+const MAP_PLACES = {
+  'Halabja': 'Halabja, Iraq', 'Kobani': 'Kobani (Ayn al-Arab), Syria',
+  'Afrin': 'Afrin, Syria', 'Amuda': 'Amuda, Al-Hasakah, Syria', 'Qamishli': 'Qamishli, Syria',
+  'Mahabad': 'Mahabad, West Azerbaijan, Iran', 'Saqqez': 'Saqqez, Kurdistan Province, Iran', 'Ilam': 'Ilam, Iran',
+  'Hakkari': 'Hakkari, Turkey', 'Mardin': 'Mardin, Turkey', 'Van': 'Van, Turkey',
+  'Zakho': 'Zakho, Iraq', 'Amedi': 'Amadiya, Duhok, Iraq', 'Duhok': 'Duhok, Iraq',
+  'Urmia': 'Urmia, Iran', 'Kermanshah': 'Kermanshah, Iran', 'Sanandaj': 'Sanandaj, Iran',
+  'Hasakah': 'Al-Hasakah, Syria', 'Kirkuk': 'Kirkuk, Iraq', 'Sulaymaniyah': 'Sulaymaniyah, Iraq',
+  'Diyarbakir': 'Diyarbakır, Turkey', 'Erbil': 'Erbil Citadel, Erbil, Iraq',
+  'Ibrahim Khalil': 'Ibrahim Khalil Border Crossing, Zakho, Iraq', 'Semalka': 'Semalka Border Crossing, Faysh Khabur, Iraq',
+  'Haji Omaran': 'Haji Omaran Border Crossing, Iraq', 'Bashmaq': 'Bashmakh Border Crossing, Penjwen, Iraq',
+  'Dukan Dam Power': 'Dukan Dam, Iraq', 'Tigris Waterworks': 'Tigris River, Mosul, Iraq',
+  'Jail': 'Amna Suraka Museum, Sulaymaniyah, Iraq', 'Free Parking': 'Mount Judi, Şırnak, Turkey', 'GO': 'Kurdistan',
+};
+const mapUrl = (name) => MAP_PLACES[name] ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(MAP_PLACES[name]) : null;
+
 const IDX = {};
 SQUARES.forEach((s, i) => { if (s.name) IDX[s.name] = i; });
 

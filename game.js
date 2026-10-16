@@ -243,7 +243,7 @@
   }
   const dieHtml = (v) => `<div class="die" data-v="${v}">${'<span></span>'.repeat(9)}</div>`;
   function turnBanner(p) {
-    return showBanner(`<div class="b-token" style="--pc:${p.color}">${p.token}</div><div class="b-title">${p.name}'s turn</div><div class="b-sub">${p.inJail ? 'In jail — roll doubles, pay the fine or use a card' : 'Click the dice to roll'}</div>`, 1300, 'turn');
+    return showBanner(`<div class="b-token" style="--pc:${p.color}">${p.token}</div><div class="b-title">${p.name}'s turn</div><div class="b-sub">${p.inJail ? 'In jail — roll doubles, pay the fine or use a card' : 'Click the dice or press Space to roll'}</div>`, 1300, 'turn');
   }
   function diceBanner(p) {
     const [a, b] = state.dice;
@@ -271,6 +271,8 @@
     setTimeout(() => el.classList.remove(cls), ms);
   }
 
+  const mapLink = (name) => (mapUrl(name) ? `<a class="map-link" href="${mapUrl(name)}" target="_blank" rel="noopener">📍 View ${name} on Google Maps</a>` : '');
+
   function deedHtml(i) {
     const s = SQUARES[i], o = state.owners[i];
     const color = s.group ? GROUPS[s.group].color : s.type === 'railroad' ? '#333' : '#777';
@@ -295,6 +297,7 @@
       <div class="kilim-strip"></div>
       <div class="deed-body"><table>${rows}</table></div>
       <div class="deed-foot">Price ${fmt(s.price)} · Mortgage value ${fmt(s.price / 2)} · ${ownerText}</div>
+      ${mapLink(s.name)}
     </div>`;
   }
 
@@ -354,26 +357,45 @@
         </svg>
         <div class="subtitle">MONOPOLY</div>
       </div>
-      <div id="dice"><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div></div>`;
+      <div id="dice"><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div></div>
+      <div id="dice-hint"></div>`;
     board.appendChild(center);
     const banner = document.createElement('div'); banner.id = 'banner'; board.appendChild(banner);
     const toastEl = document.createElement('div'); toastEl.id = 'toast'; board.appendChild(toastEl);
     const diceEl = $('#dice');
-    diceEl.title = 'Click to roll';
-    diceEl.onclick = (e) => { e.stopPropagation(); if (!busy && !state.debt && state.phase === 'roll') rollDice(); };
-    const sfxBtn = $('#sfx-btn'), musicBtn = $('#music-btn'), nowPlaying = $('#now-playing');
+    diceEl.onclick = (e) => { e.stopPropagation(); primaryAction(); };
+    // Space / Enter = roll or end turn (ignored while a dialog is open or when typing)
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+      if (!$('#modal').classList.contains('hidden')) return;
+      if ($('#game').classList.contains('hidden')) return;
+      if (e.key === ' ') e.preventDefault();
+      if (bannerSkip) { bannerSkip(); return; }
+      primaryAction();
+    });
+    const sfxBtn = $('#sfx-btn'), musicBtn = $('#music-btn');
+    const mpToggle = $('#mp-toggle'), mpTitle = $('#mp-title');
     const paint = () => {
       sfxBtn.classList.toggle('off', !Audio_.prefs.sfx);
       musicBtn.classList.toggle('off', !Audio_.prefs.music);
       const t = Audio_.music.current();
-      nowPlaying.classList.toggle('paused', !Audio_.prefs.music);
-      const label = t ? (t.title || t.name) + (t.author && t.source === 'youtube' ? ' · ' + t.author : '') : 'Music';
-      nowPlaying.innerHTML = `<span class="note">${Audio_.prefs.music ? '♪' : '▮▮'}</span>${label}${Audio_.prefs.music ? '' : ' (music off)'}`;
-      $('#yt-wrap').classList.toggle('hidden', !(Audio_.prefs.music && Audio_.music.isYouTubeActive()));
+      const on = Audio_.prefs.music;
+      const name = t ? (t.title || t.name) : 'Music';
+      const sub = !t ? 'Open the music menu' : t.source === 'youtube' ? (t.author || t.sub || 'YouTube') + ' · YouTube' : t.source === 'synth' ? 'Built-in soundtrack' : (t.sub || 'Your song');
+      mpTitle.innerHTML = `<span class="t1">${on ? '♪ ' : ''}${name}</span><span class="t2">${on ? sub : 'Paused · ' + sub}</span>`;
+      mpToggle.textContent = on ? '❚❚' : '▶';
+      mpToggle.title = on ? 'Pause' : 'Play';
+      mpToggle.classList.toggle('paused', !on);
+      $('#yt-wrap').classList.toggle('hidden', !Audio_.music.isYouTubeActive());
     };
     sfxBtn.onclick = () => { Audio_.init(); Audio_.toggleSfx(); paint(); };
     musicBtn.onclick = () => { Audio_.init(); openMusicMenu(); };
-    nowPlaying.onclick = musicBtn.onclick;
+    mpTitle.onclick = musicBtn.onclick;
+    mpToggle.onclick = () => { Audio_.init(); Audio_.music.toggle(); paint(); };
+    $('#mp-next').onclick = () => { Audio_.init(); Audio_.music.next(); };
+    $('#mp-prev').onclick = () => { Audio_.init(); Audio_.music.prev(); };
     Audio_.music.onChange(paint);
     paint();
     // Drag and drop songs anywhere on the page
@@ -409,7 +431,7 @@
       chance: 'Draw a Newroz card.',
       chest: 'Draw a Dîwan card.',
     }[s.type] || '';
-    notify(s.name, `<p>${desc}</p>`, 'Close');
+    notify(s.name, `<p>${desc}</p>${mapLink(s.name)}`, 'Close');
   }
 
   // =====================================================================
@@ -443,7 +465,13 @@
       el.querySelector('.tokens').innerHTML = tokens;
     });
     document.querySelectorAll('.die').forEach((d, k) => d.dataset.v = state.dice[k]);
-    $('#dice').classList.toggle('rollable', !busy && !state.debt && state.phase === 'roll');
+    const canRoll = !busy && !state.debt && state.phase === 'roll';
+    const canEnd = !busy && !state.debt && state.phase === 'end';
+    const dice = $('#dice');
+    dice.classList.toggle('rollable', canRoll);
+    dice.classList.toggle('endable', canEnd);
+    dice.title = canRoll ? 'Click to roll (or press Space)' : canEnd ? 'Click to end turn (or press Space)' : '';
+    $('#dice-hint').textContent = canRoll ? (cur().inJail ? 'Click to roll for doubles · Space' : 'Click to roll · Space') : canEnd ? `Click to end ${cur().name}'s turn · Space` : '';
 
     // turn box
     const p = cur();
@@ -453,8 +481,8 @@
     if (state.debt) status = `<div class="debt">Owes ${fmt(state.debt.amount)} to ${state.debt.creditor == null ? 'the bank' : state.players[state.debt.creditor].name}. Mortgage or sell to raise funds, or declare bankruptcy.</div>`;
     else if (state.phase === 'roll' && p.inJail) status = `<div class="status">In jail (attempt ${p.jailTurns + 1} of 3). Roll doubles, pay the fine, or use a card.</div>`;
     else if (state.phase === 'roll' && state.doubles > 0) status = `<div class="status">Doubles! Roll again.</div>`;
-    else if (state.phase === 'roll') status = `<div class="status">Roll the dice.</div>`;
-    else if (state.phase === 'end') status = `<div class="status">Build, trade, or end your turn.</div>`;
+    else if (state.phase === 'roll') status = `<div class="status">Roll the dice — click them or press Space.</div>`;
+    else if (state.phase === 'end') status = `<div class="status">Build or trade, then end your turn — click the dice or press Space.</div>`;
     else if (state.phase === 'over') status = `<div class="status">Game over.</div>`;
     else status = `<div class="status">…</div>`;
     tb.innerHTML = `<div class="who"><span>${p.token}</span>${p.name}'s turn</div><div class="cash">${fmt(p.money)}</div>${status}`;
@@ -518,6 +546,13 @@
   }
 
   function setBusy(v) { busy = v; render(); }
+
+  /** What the dice (and Space/Enter) do right now: roll, or end the turn. */
+  function primaryAction() {
+    if (busy || state.debt || state.phase === 'over') return;
+    if (state.phase === 'roll') rollDice();
+    else if (state.phase === 'end') endTurn();
+  }
 
   // =====================================================================
   // Money

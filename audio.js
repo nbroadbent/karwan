@@ -318,6 +318,10 @@ const Audio_ = (() => {
             if (e.data === YT.PlayerState.PLAYING) {
               const d = yt.getVideoData && yt.getVideoData();
               if (d && d.title) { current.title = d.title; current.author = d.author; current.error = null; }
+              if (!prefs.music) { prefs.music = true; savePrefs(); } // resumed from inside the YouTube player
+              emit();
+            } else if (e.data === YT.PlayerState.PAUSED) {
+              if (prefs.music) { prefs.music = false; savePrefs(); } // paused from inside the YouTube player
               emit();
             } else if (e.data === YT.PlayerState.ENDED) {
               if (current.list) return; // playlists advance by themselves
@@ -408,18 +412,32 @@ const Audio_ = (() => {
     }
     emit();
   }
-  function next() {
+  function step(dir) {
     const list = allTracks();
-    const i = list.findIndex((t) => t.id === (current && current.id));
+    if (!current) return playTrack(prefs.track);
     // stay within the same family: YouTube advances through YouTube, songs through songs, synth through synth
-    const fam = list.filter((t) => t.source === (current && current.source));
+    const fam = list.filter((t) => t.source === current.source);
     const j = fam.findIndex((t) => t.id === current.id);
-    playTrack((fam[(j + 1) % fam.length] || list[(i + 1) % list.length]).id);
+    const pick = fam.length ? fam[(j + dir + fam.length) % fam.length] : list[0];
+    if (!prefs.music) { prefs.music = true; savePrefs(); if (musicGain) musicGain.gain.value = synthVol(); }
+    playTrack(pick.id);
   }
+  const next = () => step(1);
+  const prev = () => step(-1);
+  /** Pause / resume without losing the place in the current track. */
   function setMusic(on) {
     prefs.music = on; savePrefs();
     if (musicGain) musicGain.gain.value = synthVol();
-    if (on) playTrack(prefs.track, false); else { stopSynth(); stopElement(); ytStop(); emit(); }
+    if (on) {
+      if (current && current.source === 'youtube' && ytActive && ytReady) { try { yt.playVideo(); } catch (e) { playTrack(prefs.track, false); } }
+      else if (current && current.source !== 'synth' && el) el.play().catch(() => {});
+      else playTrack(prefs.track, false);
+    } else {
+      if (ytActive && ytReady) try { yt.pauseVideo(); } catch (e) { /* ignore */ }
+      if (el) el.pause();
+      stopSynth();
+    }
+    emit();
   }
   function setVolume(v) {
     prefs.volume = Math.max(0, Math.min(1, v)); savePrefs();
@@ -454,7 +472,9 @@ const Audio_ = (() => {
   return {
     init, play, toggleSfx, prefs,
     music: {
-      tracks: allTracks, current: () => current, play: playTrack, next, setEnabled: setMusic, setVolume,
+      tracks: allTracks, current: () => current, play: playTrack, next, prev, setEnabled: setMusic, toggle: () => setMusic(!prefs.music), setVolume,
+      ytState: () => (ytReady && yt.getPlayerState ? yt.getPlayerState() : null),
+      ytTime: () => (ytReady && yt.getCurrentTime ? yt.getCurrentTime() : null),
       addFiles, removeSong, onChange: (f) => listeners.push(f),
       addYouTube, removeYouTube, parseYouTube, ytOnFile,
       isYouTubeActive: () => ytActive,

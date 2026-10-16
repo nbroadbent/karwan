@@ -6,8 +6,8 @@ computer, passing the mouse between players (hot-seat). No install, no server.
 
 ## Play
 
-Double-click `play.command`. It starts a tiny local web server (Python's
-built-in one) and opens the game at http://localhost:8765/. The server is
+Double-click `play.command`. It starts a tiny local web server (`serve.py`,
+Python, no dependencies) and opens the game at http://localhost:8765/. The server is
 needed for YouTube music; everything else also works by opening `index.html`
 directly:
 
@@ -21,6 +21,17 @@ versa.
 
 2–6 players. Your game is saved automatically in the browser, so you can close
 the tab and pick it up later from the start screen.
+
+## Controls
+
+- Click the dice in the centre of the board (or press **Space** / **Enter**) to
+  roll. After your move the same click or key ends your turn.
+- Banners announce whose turn it is, the dice roll and where you landed; click a
+  banner or press Space to skip it.
+- Click any square to see its deed card, including a **View on Google Maps**
+  button that opens the real place.
+- The player bar under the side panel's video has Previous, Play/Pause and Next
+  for whatever music is playing.
 
 ## The board
 
@@ -84,5 +95,6 @@ songs stream from YouTube or come from your own collection.
 - `style.css` – board and UI styling
 - `data.js` – squares, rents, card text
 - `audio.js` – sound effects, built-in soundtracks, song library
+- `serve.py` / `play.command` – local no-cache web server and launcher
 - `music/` – optional folder for your own audio files and the playlist helper
 - `game.js` – rules engine and UI
