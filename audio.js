@@ -1,13 +1,18 @@
-// Kurdistan Monopoly — synthesized audio (no sound files needed)
-// Sound effects + a looping soundtrack: daf rhythm, tembûr-style drone and a
-// melody in Maqam Kurd (Phrygian on D), the scale of many Kurdish folk songs.
+// Kurdistan Monopoly — audio: synthesized sound effects, a jukebox of
+// built-in Kurdish-style soundtracks, and a library of the player's own songs.
+//
+// Built-in tracks are synthesized with the Web Audio API in traditional Kurdish
+// modes (Maqam Kurd, Hijaz, Rast) and dance rhythms (govend, delîlo, halparke).
+// Real recordings can be added from local files; they are kept in IndexedDB so
+// they survive reloads, or listed in music/playlist.js.
 const Audio_ = (() => {
   const PREF_KEY = 'kurdistan-monopoly-audio';
-  const prefs = Object.assign({ sfx: true, music: true }, JSON.parse(localStorage.getItem(PREF_KEY) || '{}'));
+  const prefs = Object.assign({ sfx: true, music: true, track: 'govend', volume: 0.6 }, JSON.parse(localStorage.getItem(PREF_KEY) || '{}'));
+  const YT_KEY = 'kurdistan-monopoly-youtube';
   let ctx = null, master, sfxGain, musicGain;
-  let musicTimer = null, nextBeat = 0, beatIndex = 0;
-
+  const listeners = [];
   function savePrefs() { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); }
+  function emit() { listeners.forEach((f) => f()); }
 
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -16,28 +21,44 @@ const Audio_ = (() => {
     ctx = new AC();
     master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
     sfxGain = ctx.createGain(); sfxGain.gain.value = prefs.sfx ? 1 : 0; sfxGain.connect(master);
-    musicGain = ctx.createGain(); musicGain.gain.value = prefs.music ? 0.32 : 0; musicGain.connect(master);
-    if (prefs.music) startMusic();
+    musicGain = ctx.createGain(); musicGain.gain.value = synthVol(); musicGain.connect(master);
+    loadUserSongs().then(() => { if (prefs.music) playTrack(prefs.track, false); });
   }
+  const synthVol = () => (prefs.music ? 0.55 * prefs.volume : 0);
 
-  // ---------- primitives ----------
-  function tone(freq, { type = 'sine', dur = 0.2, vol = 0.3, attack = 0.005, decay, dest = sfxGain, when = 0, slideTo, filter } = {}) {
+  // =====================================================================
+  // Synth primitives
+  // =====================================================================
+  function noteFreq(name) {
+    const m = /^([A-G])([#b]?)(\d)$/.exec(name);
+    if (!m) return 440;
+    const base = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+    return 440 * 2 ** ((base + (+m[3] - 4) * 12) / 12);
+  }
+  function tone(freq, { type = 'sine', dur = 0.2, vol = 0.3, attack = 0.005, release, dest = sfxGain, when = 0, slideTo, filter, vibrato } = {}) {
     if (!ctx) return;
     const t = ctx.currentTime + when;
     const o = ctx.createOscillator();
     o.type = type; o.frequency.setValueAtTime(freq, t);
     if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    if (vibrato) {
+      const lfo = ctx.createOscillator(), lg = ctx.createGain();
+      lfo.frequency.value = vibrato.rate || 5.5; lg.gain.value = freq * (vibrato.depth || 0.008);
+      lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur + 0.3);
+    }
     const g = ctx.createGain();
+    const rel = release ?? Math.min(0.08, dur);
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(vol, t + attack);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + (decay || dur));
+    if (release != null) { g.gain.setValueAtTime(vol, t + Math.max(attack, dur - rel)); g.gain.linearRampToValueAtTime(0.0001, t + dur); }
+    else g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     let node = o;
     if (filter) { const f = ctx.createBiquadFilter(); f.type = filter.type || 'lowpass'; f.frequency.value = filter.freq; f.Q.value = filter.q || 1; o.connect(f); node = f; }
     node.connect(g); g.connect(dest);
-    o.start(t); o.stop(t + (decay || dur) + 0.05);
+    o.start(t); o.stop(t + dur + 0.3);
   }
   let noiseBuf = null;
-  function noise({ dur = 0.1, vol = 0.3, hp = 1000, lp = 8000, when = 0, dest = sfxGain, decay } = {}) {
+  function noise({ dur = 0.1, vol = 0.3, hp = 1000, lp = 8000, when = 0, dest = sfxGain } = {}) {
     if (!ctx) return;
     if (!noiseBuf) {
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -50,12 +71,366 @@ const Audio_ = (() => {
     const l = ctx.createBiquadFilter(); l.type = 'lowpass'; l.frequency.value = lp;
     const g = ctx.createGain();
     g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + (decay || dur));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(h); h.connect(l); l.connect(g); g.connect(dest);
-    s.start(t); s.stop(t + (decay || dur) + 0.02);
+    s.start(t); s.stop(t + dur + 0.02);
+  }
+  function daf(kind, when, dest, vol = 1) { // frame drum: dum (centre) / tek (rim)
+    if (kind === 'dum') {
+      tone(150, { type: 'sine', dur: 0.25, vol: 0.9 * vol, slideTo: 55, dest, when });
+      noise({ dur: 0.04, vol: 0.2 * vol, hp: 100, lp: 900, dest, when });
+    } else {
+      noise({ dur: 0.07, vol: 0.45 * vol, hp: 2500, lp: 9000, dest, when });
+      tone(1100, { type: 'triangle', dur: 0.05, vol: 0.12 * vol, dest, when });
+    }
+  }
+  const INSTRUMENTS = {
+    pluck(freq, when, dur, vol) { // tembûr / saz
+      tone(freq, { type: 'triangle', dur: Math.max(0.45, dur), vol, attack: 0.004, dest: musicGain, when, filter: { freq: 2200, q: 0.7 } });
+      tone(freq * 2, { type: 'sine', dur: 0.2, vol: vol * 0.25, dest: musicGain, when });
+    },
+    bow(freq, when, dur, vol) { // kemençe-like bowed string
+      tone(freq, { type: 'sawtooth', dur, vol: vol * 0.55, attack: 0.09, release: 0.12, dest: musicGain, when, filter: { freq: 1500, q: 1.2 }, vibrato: { rate: 5.2, depth: 0.007 } });
+      tone(freq, { type: 'triangle', dur, vol: vol * 0.25, attack: 0.09, release: 0.12, dest: musicGain, when, vibrato: { rate: 5.2, depth: 0.007 } });
+    },
+    reed(freq, when, dur, vol) { // zurna-like double reed
+      tone(freq, { type: 'sawtooth', dur, vol: vol * 0.5, attack: 0.025, release: 0.06, dest: musicGain, when, filter: { freq: 1900, q: 3 }, vibrato: { rate: 6.5, depth: 0.006 } });
+      tone(freq, { type: 'square', dur, vol: vol * 0.12, attack: 0.025, release: 0.06, dest: musicGain, when, filter: { freq: 1200, q: 1 } });
+    },
+    flute(freq, when, dur, vol) { // bilûr / shepherd's flute
+      tone(freq, { type: 'sine', dur, vol: vol * 0.7, attack: 0.06, release: 0.1, dest: musicGain, when, vibrato: { rate: 5, depth: 0.005 } });
+      tone(freq * 2, { type: 'sine', dur, vol: vol * 0.12, attack: 0.06, release: 0.1, dest: musicGain, when });
+      noise({ dur: Math.min(0.12, dur), vol: 0.03, hp: 2000, lp: 6000, dest: musicGain, when });
+    },
+  };
+
+  // =====================================================================
+  // Built-in soundtracks (slot = one note position; '-' holds, null rests)
+  // =====================================================================
+  const SYNTH_TRACKS = [
+    {
+      id: 'govend', name: 'Govend', sub: 'Line-dance tune · Maqam Kurd · daf and tembûr',
+      slot: 60 / 104 / 2, bar: 8, rhythm: 'D.ttD.t.', lead: 'pluck', leadVol: 0.5,
+      drone: ['D3', 'A3'],
+      melody: [
+        'D4', 'Eb4', 'F4', 'G4', 'A4', 'G4', 'F4', 'Eb4',
+        'D4', 'D4', 'F4', 'A4', 'G4', 'F4', 'Eb4', 'D4',
+        'A4', 'Bb4', 'A4', 'G4', 'F4', 'G4', 'A4', null,
+        'G4', 'F4', 'Eb4', 'D4', 'Eb4', 'D4', 'C4', 'D4',
+        'D5', 'C5', 'Bb4', 'A4', 'Bb4', 'A4', 'G4', 'F4',
+        'G4', 'A4', 'Bb4', 'A4', 'G4', 'F4', 'Eb4', 'D4',
+        'F4', 'G4', 'A4', 'G4', 'F4', 'Eb4', 'D4', 'Eb4',
+        'D4', null, 'A3', null, 'D4', null, null, null],
+    },
+    {
+      id: 'delilo', name: 'Delîlo', sub: 'Swaying 6/8 dance · Hijaz · daf and tembûr',
+      slot: 0.175, bar: 6, rhythm: 'D.tDt.', lead: 'pluck', leadVol: 0.5,
+      drone: ['D3', 'A3'],
+      melody: [
+        'D4', 'F#4', 'G4', 'A4', '-', '-',
+        'Bb4', 'A4', 'G4', 'F#4', '-', '-',
+        'G4', 'A4', 'Bb4', 'A4', 'G4', 'F#4',
+        'Eb4', 'F#4', 'D4', '-', '-', '-',
+        'A4', 'Bb4', 'C5', 'Bb4', 'A4', 'G4',
+        'F#4', 'G4', 'A4', 'G4', 'F#4', 'Eb4',
+        'D4', 'Eb4', 'F#4', 'G4', 'F#4', 'Eb4',
+        'D4', '-', '-', 'A3', '-', '-'],
+    },
+    {
+      id: 'dengbej', name: 'Dengbêj', sub: 'Slow mountain lament · Maqam Kurd · bowed kemençe over a drone',
+      slot: 0.42, bar: 4, rhythm: '', lead: 'bow', leadVol: 0.55,
+      drone: ['D3', 'D4'], droneVol: 0.5,
+      melody: [
+        'A4', '-', 'Bb4', 'A4', 'G4', '-', 'F4', '-',
+        'Eb4', 'F4', 'G4', 'F4', 'Eb4', '-', 'D4', '-',
+        'F4', '-', 'G4', 'A4', 'Bb4', '-', 'A4', 'G4',
+        'F4', 'Eb4', 'D4', 'Eb4', 'D4', '-', '-', '-',
+        'C5', '-', 'Bb4', 'A4', 'Bb4', '-', 'A4', '-',
+        'G4', 'A4', 'G4', 'F4', 'Eb4', '-', 'F4', '-',
+        'G4', '-', 'F4', 'Eb4', 'D4', '-', 'Eb4', 'D4',
+        'C4', '-', 'D4', '-', '-', '-', null, null],
+    },
+    {
+      id: 'halparke', name: 'Halparke', sub: 'Fast festival dance · Hijaz · zurna and driving daf',
+      slot: 60 / 132 / 2, bar: 8, rhythm: 'D.tDt.tt', lead: 'reed', leadVol: 0.42,
+      drone: ['D3'],
+      melody: [
+        'D5', 'C5', 'Bb4', 'A4', 'Bb4', 'A4', 'G4', 'F#4',
+        'G4', 'A4', 'Bb4', 'A4', 'G4', 'F#4', 'Eb4', 'D4',
+        'F#4', 'G4', 'A4', '-', 'A4', 'Bb4', 'A4', 'G4',
+        'F#4', 'Eb4', 'D4', 'Eb4', 'F#4', '-', '-', '-',
+        'A4', 'A4', 'Bb4', 'C5', 'D5', '-', 'C5', 'Bb4',
+        'A4', 'G4', 'F#4', 'G4', 'A4', '-', '-', '-',
+        'Bb4', 'A4', 'G4', 'F#4', 'Eb4', 'F#4', 'G4', 'F#4',
+        'Eb4', 'D4', '-', '-', 'D4', '-', '-', '-'],
+    },
+    {
+      id: 'newroz', name: 'Newroz', sub: 'Bright spring festival tune · Rast · flute, tembûr and daf',
+      slot: 60 / 112 / 2, bar: 8, rhythm: 'D.t.Dt.t', lead: 'flute', leadVol: 0.5, second: 'pluck',
+      drone: ['D3', 'A3'],
+      melody: [
+        'D4', 'E4', 'F#4', 'G4', 'A4', '-', 'F#4', 'A4',
+        'B4', 'A4', 'G4', 'F#4', 'E4', '-', 'D4', '-',
+        'F#4', 'G4', 'A4', 'B4', 'C5', 'B4', 'A4', 'G4',
+        'A4', '-', 'F#4', '-', 'D4', '-', '-', '-',
+        'A4', 'B4', 'C5', 'B4', 'A4', 'G4', 'F#4', 'G4',
+        'A4', '-', 'G4', 'F#4', 'E4', '-', 'D4', 'E4',
+        'F#4', 'A4', 'G4', 'F#4', 'E4', 'D4', 'E4', 'F#4',
+        'D4', '-', '-', '-', 'A3', '-', 'D4', '-'],
+    },
+  ];
+
+  let synthTimer = null, nextSlot = 0, slotIndex = 0, synthTrack = null;
+  function scheduleSynth() {
+    if (!ctx || !synthTrack) return;
+    const T = synthTrack;
+    while (nextSlot < ctx.currentTime + 0.45) {
+      const when = nextSlot - ctx.currentTime;
+      const i = slotIndex % T.melody.length;
+      if (i % (T.bar * 2) === 0 && T.drone) {
+        const dur = T.slot * T.bar * 2;
+        T.drone.forEach((n, k) => tone(noteFreq(n), { type: 'sawtooth', dur, vol: (k ? 0.06 : 0.14) * (T.droneVol || 1), attack: 0.3, release: 0.4, dest: musicGain, when, filter: { freq: 420, q: 2 } }));
+      }
+      if (T.rhythm) {
+        const r = T.rhythm[i % T.rhythm.length];
+        if (r === 'D') daf('dum', when, musicGain);
+        if (r === 't') daf('tek', when, musicGain);
+      }
+      const n = T.melody[i];
+      if (n && n !== '-') {
+        let len = 1;
+        while (T.melody[(i + len) % T.melody.length] === '-' && len < 16) len++;
+        const dur = T.slot * len;
+        const accent = i % T.bar === 0 ? 1.1 : 0.85;
+        INSTRUMENTS[T.lead](noteFreq(n), when, dur, T.leadVol * accent);
+        if (T.second && i % 2 === 0) INSTRUMENTS[T.second](noteFreq(n) / 2, when, dur, 0.25);
+      }
+      nextSlot += T.slot;
+      slotIndex++;
+    }
+  }
+  function startSynth(track) {
+    stopSynth();
+    synthTrack = track;
+    nextSlot = ctx.currentTime + 0.1; slotIndex = 0;
+    synthTimer = setInterval(scheduleSynth, 100);
+  }
+  function stopSynth() { clearInterval(synthTimer); synthTimer = null; synthTrack = null; }
+
+  // =====================================================================
+  // User songs: IndexedDB library + music/playlist.js
+  // =====================================================================
+  let userSongs = []; // { id, name, url, source: 'library' | 'folder' }
+  let db = null;
+  function openDb() {
+    return new Promise((resolve) => {
+      if (db) return resolve(db);
+      if (!window.indexedDB) return resolve(null);
+      const req = indexedDB.open('kurdistan-monopoly', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('songs', { keyPath: 'id' });
+      req.onsuccess = () => { db = req.result; resolve(db); };
+      req.onerror = () => resolve(null);
+    });
+  }
+  async function loadUserSongs() {
+    userSongs.forEach((s) => s.source === 'library' && URL.revokeObjectURL(s.url));
+    userSongs = (window.USER_PLAYLIST || []).map((t, k) => ({ id: 'folder-' + k, name: t.title || t.file, sub: t.artist || 'From music folder', url: 'music/' + t.file, source: 'folder' }));
+    const d = await openDb();
+    if (d) {
+      const rows = await new Promise((resolve) => {
+        const r = d.transaction('songs').objectStore('songs').getAll();
+        r.onsuccess = () => resolve(r.result || []); r.onerror = () => resolve([]);
+      });
+      rows.sort((a, b) => a.added - b.added);
+      rows.forEach((row) => userSongs.push({ id: row.id, name: row.name, sub: 'Your library', url: URL.createObjectURL(row.blob), source: 'library' }));
+    }
+    emit();
+  }
+  async function addFiles(files) {
+    const d = await openDb();
+    const list = [...files].filter((f) => /^audio\//.test(f.type) || /\.(mp3|m4a|aac|ogg|oga|wav|flac|opus)$/i.test(f.name));
+    if (!list.length) return 0;
+    let firstId = null;
+    for (const f of list) {
+      const id = 'song-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      firstId = firstId || id;
+      const name = f.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ');
+      if (d) await new Promise((resolve) => { const tx = d.transaction('songs', 'readwrite'); tx.objectStore('songs').put({ id, name, blob: f, added: Date.now() }); tx.oncomplete = resolve; tx.onerror = resolve; });
+      else userSongs.push({ id, name, sub: 'This session only', url: URL.createObjectURL(f), source: 'library' });
+    }
+    if (d) await loadUserSongs(); else emit();
+    return list.length;
+  }
+  async function removeSong(id) {
+    const d = await openDb();
+    if (d) await new Promise((resolve) => { const tx = d.transaction('songs', 'readwrite'); tx.objectStore('songs').delete(id); tx.oncomplete = resolve; tx.onerror = resolve; });
+    if (current && current.id === id) { stopElement(); prefs.track = 'govend'; savePrefs(); if (prefs.music) playTrack(prefs.track, false); }
+    await loadUserSongs();
   }
 
-  // ---------- sound effects ----------
+  // =====================================================================
+  // YouTube: stream real songs through YouTube's embedded player
+  // =====================================================================
+  // Starter list of Kurdish songs. Many official label uploads have embedding
+  // disabled by their owners, so these are uploads verified to play embedded.
+  const YT_PRESETS = [
+    { v: 'jYKb8xmcUQ4', name: 'Kîne Em', sub: 'Şivan Perwer' },
+    { v: '34rewThPFyw', name: 'Keçe Kurdan (live in Chicago)', sub: 'Aynur Doğan' },
+    { v: 'bpY2F0t3ZFw', name: 'Balangar', sub: 'Hesen Zîrek' },
+    { v: 'OK4wcO-uAng', name: 'Ey Reqîb', sub: 'Kurdish anthem' },
+    { v: 'bhbZ6U2EGA8', name: 'Lorke', sub: 'Kurdish Echoes' },
+    { v: 'DJEBukQ8D-M', name: 'Lorke Lorke', sub: 'Zozan C.' },
+    { v: 'tVyV21gdLHQ', name: 'Şad û Helperkê', sub: 'Hêlîn Music · dance album, 37 min' },
+    { v: '3qdHQHxsf6g', name: 'Kurdish Folk Mix', sub: 'Kurdish Folk Stran · 18 min' },
+  ];
+  let ytUser = JSON.parse(localStorage.getItem(YT_KEY) || '[]');
+  const saveYt = () => localStorage.setItem(YT_KEY, JSON.stringify(ytUser));
+  const ytId = (t) => 'yt-' + (t.list ? 'list-' + t.list : t.v);
+  function ytTracks() {
+    return [...YT_PRESETS.map((t) => ({ ...t, id: ytId(t), source: 'youtube', preset: true })),
+      ...ytUser.map((t) => ({ ...t, id: ytId(t), source: 'youtube' }))];
+  }
+  const ytOnFile = location.protocol === 'file:';
+  let yt = null, ytReady = false, ytApiRequested = false, ytPending = null, ytActive = false, ytErrorTimer = null;
+  function parseYouTube(str) {
+    str = (str || '').trim();
+    if (!str) return null;
+    let m;
+    if ((m = /[?&]list=([A-Za-z0-9_-]+)/.exec(str))) return { list: m[1] };
+    if ((m = /(?:youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)([A-Za-z0-9_-]{11})/.exec(str))) return { v: m[1] };
+    if (/^[A-Za-z0-9_-]{11}$/.test(str)) return { v: str };
+    if (/^(PL|UU|OL|RD|FL)[A-Za-z0-9_-]{10,}$/.test(str)) return { list: str };
+    return null;
+  }
+  function ensureYtApi() {
+    if (ytApiRequested) return;
+    ytApiRequested = true;
+    window.onYouTubeIframeAPIReady = () => {
+      const host = document.getElementById('yt-player');
+      if (!host) return;
+      yt = new YT.Player('yt-player', {
+        width: '100%', height: '100%',
+        playerVars: { playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin === 'null' ? undefined : location.origin },
+        events: {
+          onReady: () => { ytReady = true; yt.setVolume(Math.round(prefs.volume * 100)); if (ytPending) { const p = ytPending; ytPending = null; ytLoad(p); } },
+          onStateChange: (e) => {
+            if (!current || current.source !== 'youtube') return;
+            if (e.data === YT.PlayerState.PLAYING) {
+              const d = yt.getVideoData && yt.getVideoData();
+              if (d && d.title) { current.title = d.title; current.author = d.author; current.error = null; }
+              emit();
+            } else if (e.data === YT.PlayerState.ENDED) {
+              if (current.list) return; // playlists advance by themselves
+              next();
+            } else emit();
+          },
+          onError: (e) => {
+            if (!current || current.source !== 'youtube') return;
+            current.error = { 2: 'Invalid video link', 5: 'Player error', 100: 'Video not found or private', 101: 'Owner does not allow embedding', 150: 'Owner does not allow embedding', 153: 'YouTube refused to play on a file:// page. Open the game via play.command (localhost).' }[e.data] || ('YouTube error ' + e.data);
+            emit();
+            clearTimeout(ytErrorTimer);
+            if (!current.list && !ytOnFile) ytErrorTimer = setTimeout(() => { if (current && current.error) next(); }, 2500);
+          },
+        },
+      });
+    };
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    s.onerror = () => { if (current && current.source === 'youtube') { current.error = 'YouTube needs an internet connection'; emit(); } };
+    document.head.appendChild(s);
+  }
+  function ytLoad(track) {
+    if (!ytReady) { ytPending = track; ensureYtApi(); return; }
+    if (track.list) yt.loadPlaylist({ list: track.list, listType: 'playlist' });
+    else yt.loadVideoById(track.v);
+    yt.setVolume(Math.round(prefs.volume * 100));
+  }
+  function ytStop() {
+    ytPending = null; clearTimeout(ytErrorTimer);
+    if (ytActive) { ytActive = false; if (ytReady && yt.stopVideo) try { yt.stopVideo(); } catch (e) { /* ignore */ } }
+  }
+  async function addYouTube(input) {
+    const parsed = parseYouTube(input);
+    if (!parsed) return null;
+    if (ytTracks().some((t) => (parsed.list ? t.list === parsed.list : t.v === parsed.v))) return ytTracks().find((t) => (parsed.list ? t.list === parsed.list : t.v === parsed.v));
+    const entry = { ...parsed, name: parsed.list ? 'YouTube playlist' : 'YouTube video', sub: parsed.list ? 'Playlist ' + parsed.list : 'Added by you' };
+    ytUser.push(entry); saveYt(); emit();
+    // Try to fetch the title (may be blocked by CORS on some setups — the player fills it in on play anyway).
+    if (parsed.v) {
+      try {
+        const r = await fetch('https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=' + parsed.v + '&format=json');
+        if (r.ok) { const j = await r.json(); entry.name = j.title; entry.sub = j.author_name; saveYt(); emit(); }
+      } catch (e) { /* fine */ }
+    }
+    return { ...entry, id: ytId(entry), source: 'youtube' };
+  }
+  function removeYouTube(id) {
+    ytUser = ytUser.filter((t) => ytId(t) !== id); saveYt();
+    if (current && current.id === id) { ytStop(); prefs.track = 'govend'; savePrefs(); if (prefs.music) playTrack(prefs.track, false); }
+    emit();
+  }
+
+  // =====================================================================
+  // Playback control
+  // =====================================================================
+  let el = null, current = null;
+  function stopElement() {
+    if (!el) return;
+    const old = el; el = null;
+    old.onended = null; old.onerror = null; // clearing src fires a spurious error event otherwise
+    old.pause(); old.removeAttribute('src'); old.load();
+  }
+  const synthList = SYNTH_TRACKS.map((t) => ({ id: t.id, name: t.name, sub: t.sub, source: 'synth' }));
+  const ytCache = {}; // keep one object per id so error/title state survives re-renders
+  function allTracks() {
+    const yts = ytTracks().map((t) => { if (!ytCache[t.id]) ytCache[t.id] = t; else Object.assign(ytCache[t.id], { name: t.name, sub: t.sub }); return ytCache[t.id]; });
+    return [...synthList, ...yts, ...userSongs];
+  }
+  function playTrack(id, save = true) {
+    const track = allTracks().find((t) => t.id === id) || allTracks()[0];
+    current = track;
+    track.error = false;
+    prefs.track = track.id;
+    if (save) savePrefs();
+    stopSynth(); stopElement(); ytStop();
+    if (!prefs.music || !ctx) { emit(); return; }
+    if (track.source === 'synth') {
+      startSynth(SYNTH_TRACKS.find((t) => t.id === track.id));
+    } else if (track.source === 'youtube') {
+      ytActive = true;
+      ytLoad(track);
+    } else {
+      el = new window.Audio(track.url);
+      el.volume = prefs.volume;
+      el.onended = () => next();
+      el.onerror = () => { current.error = true; emit(); };
+      el.play().catch(() => {});
+    }
+    emit();
+  }
+  function next() {
+    const list = allTracks();
+    const i = list.findIndex((t) => t.id === (current && current.id));
+    // stay within the same family: YouTube advances through YouTube, songs through songs, synth through synth
+    const fam = list.filter((t) => t.source === (current && current.source));
+    const j = fam.findIndex((t) => t.id === current.id);
+    playTrack((fam[(j + 1) % fam.length] || list[(i + 1) % list.length]).id);
+  }
+  function setMusic(on) {
+    prefs.music = on; savePrefs();
+    if (musicGain) musicGain.gain.value = synthVol();
+    if (on) playTrack(prefs.track, false); else { stopSynth(); stopElement(); ytStop(); emit(); }
+  }
+  function setVolume(v) {
+    prefs.volume = Math.max(0, Math.min(1, v)); savePrefs();
+    if (musicGain) musicGain.gain.value = synthVol();
+    if (el) el.volume = prefs.volume;
+    if (ytReady && ytActive) yt.setVolume(Math.round(prefs.volume * 100));
+  }
+
+  // =====================================================================
+  // Sound effects
+  // =====================================================================
   const sfx = {
     dice() { for (let i = 0; i < 7; i++) { noise({ dur: 0.05, vol: 0.25, hp: 2500, lp: 9000, when: i * 0.07 }); tone(900 + Math.random() * 700, { type: 'square', dur: 0.03, vol: 0.05, when: i * 0.07 }); } },
     step() { tone(1800, { type: 'triangle', dur: 0.05, vol: 0.12, slideTo: 900 }); },
@@ -74,71 +449,16 @@ const Audio_ = (() => {
     },
   };
   function play(name) { if (ctx && prefs.sfx && sfx[name]) sfx[name](); }
+  function toggleSfx() { prefs.sfx = !prefs.sfx; if (sfxGain) sfxGain.gain.value = prefs.sfx ? 1 : 0; savePrefs(); if (prefs.sfx) play('click'); emit(); return prefs.sfx; }
 
-  // ---------- music ----------
-  // Maqam Kurd on D: D Eb F G A Bb C
-  const N = { C3: 130.81, D3: 146.83, A3: 220, C4: 261.63, D4: 293.66, Eb4: 311.13, F4: 349.23, G4: 392, A4: 440, Bb4: 466.16, C5: 523.25, D5: 587.33, Eb5: 622.25 };
-  const MELODY = [ // eighth notes, 8 bars of 8; null = rest, '-' = tie/hold
-    'D4', 'Eb4', 'F4', 'G4', 'A4', 'G4', 'F4', 'Eb4',
-    'D4', 'D4', 'F4', 'A4', 'G4', 'F4', 'Eb4', 'D4',
-    'A4', 'Bb4', 'A4', 'G4', 'F4', 'G4', 'A4', null,
-    'G4', 'F4', 'Eb4', 'D4', 'Eb4', 'D4', 'C4', 'D4',
-    'D5', 'C5', 'Bb4', 'A4', 'Bb4', 'A4', 'G4', 'F4',
-    'G4', 'A4', 'Bb4', 'A4', 'G4', 'F4', 'Eb4', 'D4',
-    'F4', 'G4', 'A4', 'G4', 'F4', 'Eb4', 'D4', 'Eb4',
-    'D4', null, 'A3', null, 'D4', null, null, null,
-  ];
-  const RHYTHM = 'D.ttD.t.'; // govend-style daf pattern per bar (eighths)
-  const EIGHTH = 60 / 104 / 2; // 104 bpm
-
-  function daf(kind, when, dest) {
-    if (!ctx) return;
-    if (kind === 'dum') {
-      tone(150, { type: 'sine', dur: 0.25, vol: 0.9, slideTo: 55, dest, when });
-      noise({ dur: 0.04, vol: 0.2, hp: 100, lp: 900, dest, when });
-    } else {
-      noise({ dur: 0.07, vol: 0.45, hp: 2500, lp: 9000, dest, when });
-      tone(1100, { type: 'triangle', dur: 0.05, vol: 0.12, dest, when });
-    }
-  }
-  function pluck(freq, when, vol = 0.5) { // tembûr-ish pluck
-    tone(freq, { type: 'triangle', dur: 0.5, vol, attack: 0.004, dest: musicGain, when, filter: { freq: 2200, q: 0.7 } });
-    tone(freq * 2, { type: 'sine', dur: 0.2, vol: vol * 0.25, dest: musicGain, when });
-  }
-  function drone(when) {
-    tone(N.D3, { type: 'sawtooth', dur: EIGHTH * 8, vol: 0.14, attack: 0.3, dest: musicGain, when, filter: { freq: 420, q: 2 } });
-    tone(N.A3, { type: 'sawtooth', dur: EIGHTH * 8, vol: 0.06, attack: 0.3, dest: musicGain, when, filter: { freq: 500, q: 2 } });
-  }
-
-  function scheduler() {
-    if (!ctx) return;
-    while (nextBeat < ctx.currentTime + 0.4) {
-      const when = nextBeat - ctx.currentTime;
-      const i = beatIndex % MELODY.length;
-      if (i % 8 === 0) drone(when);
-      const r = RHYTHM[i % 8];
-      if (r === 'D') daf('dum', when, musicGain);
-      if (r === 't') daf('tek', when, musicGain);
-      const n = MELODY[i];
-      if (n) pluck(N[n], when, i % 4 === 0 ? 0.55 : 0.4);
-      nextBeat += EIGHTH;
-      beatIndex++;
-    }
-  }
-  function startMusic() {
-    if (!ctx || musicTimer) return;
-    nextBeat = ctx.currentTime + 0.1; beatIndex = 0;
-    musicTimer = setInterval(scheduler, 100);
-  }
-  function stopMusic() { clearInterval(musicTimer); musicTimer = null; }
-
-  // ---------- toggles ----------
-  function toggleSfx() { prefs.sfx = !prefs.sfx; if (sfxGain) sfxGain.gain.value = prefs.sfx ? 1 : 0; savePrefs(); if (prefs.sfx) play('click'); return prefs.sfx; }
-  function toggleMusic() {
-    prefs.music = !prefs.music; savePrefs();
-    if (ctx) { musicGain.gain.value = prefs.music ? 0.32 : 0; if (prefs.music) startMusic(); else stopMusic(); }
-    return prefs.music;
-  }
-
-  return { init, play, toggleSfx, toggleMusic, prefs };
+  return {
+    init, play, toggleSfx, prefs,
+    music: {
+      tracks: allTracks, current: () => current, play: playTrack, next, setEnabled: setMusic, setVolume,
+      addFiles, removeSong, onChange: (f) => listeners.push(f),
+      addYouTube, removeYouTube, parseYouTube, ytOnFile,
+      isYouTubeActive: () => ytActive,
+      isPlaying: () => prefs.music && !!(synthTimer || (el && !el.paused) || (ytActive && ytReady && yt.getPlayerState && yt.getPlayerState() === 1)),
+    },
+  };
 })();

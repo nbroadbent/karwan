@@ -1,2 +1,12 @@
 .context/
 .DS_Store
+
+# personal music collection (see music/README.md)
+music/*.mp3
+music/*.m4a
+music/*.aac
+music/*.ogg
+music/*.oga
+music/*.wav
+music/*.flac
+music/*.opus

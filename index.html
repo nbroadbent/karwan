@@ -40,7 +40,7 @@
       </div>
 
       <button id="start-btn" class="btn primary large">Start Game</button>
-      <p class="muted" style="margin:10px 0 0">Sound and music play once the game starts. Toggle them with 🔊 and 🎵 in the side panel.</p>
+      <p class="muted" style="margin:10px 0 0">Sound and music play once the game starts. Use 🎵 in the side panel to pick a soundtrack or add your own Kurdish songs.</p>
       <div class="kilim-strip bottom"></div>
     </div>
   </div>
@@ -55,16 +55,19 @@
         <h2>Kurdistan Monopoly</h2>
         <div class="audio-btns">
           <button id="sfx-btn" class="btn ghost small" title="Sound effects">🔊</button>
-          <button id="music-btn" class="btn ghost small" title="Music">🎵</button>
+          <button id="music-btn" class="btn ghost small" title="Music: choose a soundtrack or add your own songs">🎵</button>
         </div>
       </div>
       <div class="kilim-strip"></div>
+      <button id="now-playing" class="now-playing" title="Open music menu"></button>
 
       <div id="turn-box"></div>
 
       <div id="actions" class="actions"></div>
 
       <div id="players"></div>
+
+      <div id="yt-wrap" class="hidden"><div id="yt-player"></div></div>
 
       <div id="log-wrap">
         <div class="log-title">Game log</div>
@@ -83,6 +86,7 @@
   </div>
 
   <script src="data.js"></script>
+  <script src="music/playlist.js"></script>
   <script src="audio.js"></script>
   <script src="game.js"></script>
 </body>

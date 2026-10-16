@@ -6,11 +6,18 @@ computer, passing the mouse between players (hot-seat). No install, no server.
 
 ## Play
 
-Double-click `play.command`, or open `index.html` in any browser:
+Double-click `play.command`. It starts a tiny local web server (Python's
+built-in one) and opens the game at http://localhost:8765/. The server is
+needed for YouTube music; everything else also works by opening `index.html`
+directly:
 
 ```sh
 open index.html
 ```
+
+Saved games and added songs live in the browser and are kept per origin, so a
+game saved from `index.html` is not visible at the localhost address and vice
+versa.
 
 2–6 players. Your game is saved automatically in the browser, so you can close
 the tab and pick it up later from the start screen.
@@ -33,13 +40,33 @@ of railroads. Dukan Dam Power and Tigris Waterworks are the utilities.
 Chance cards are **Newroz** cards and Community Chest cards are **Dîwan** cards.
 Currency is the dinar (Ð).
 
-## Sound
+## Sound and music
 
-All audio is synthesized in the browser with the Web Audio API, so there are no
-sound files. Dice, footsteps, cash, cards, building and jail each have their own
-effect, and a looping soundtrack plays a daf rhythm with a tembûr-style drone and
-a melody in Maqam Kurd. Toggle effects (🔊) and music (🎵) from the side panel;
-the choice is remembered.
+Sound effects are synthesized in the browser with the Web Audio API: dice,
+footsteps, cash, cards, building, bidding, jail and a victory fanfare. Toggle
+them with 🔊 in the side panel.
+
+The 🎵 button opens the music menu, which has three sections:
+
+- **Built-in soundtracks** — five looping pieces synthesized live in traditional
+  Kurdish modes and dance forms: *Govend* (line dance, Maqam Kurd), *Delîlo*
+  (swaying 6/8, Hijaz), *Dengbêj* (slow lament on bowed kemençe), *Halparke*
+  (fast festival dance with zurna) and *Newroz* (bright Rast tune on flute).
+  These are original compositions in the style, not transcriptions of specific songs.
+- **Real songs from YouTube** — streams through YouTube's own embedded player,
+  so it needs an internet connection and the game served from localhost (use
+  `play.command`). A starter list of Kurdish classics is included, and you can
+  paste any YouTube video or playlist link to add it. Some uploads have embedding
+  disabled by their owner; the menu says so and skips to the next track.
+- **Your songs** — real Kurdish music from your own files. Click *Add songs from
+  your Mac* or drag MP3 / M4A / WAV / FLAC files onto the game. Songs are stored
+  in the browser (IndexedDB) and persist between sessions; nothing is uploaded.
+  You can also drop files into the `music/` folder and run
+  `./music/make-playlist.sh` (see `music/README.md`).
+
+Pause, skip, set the volume and remove songs from the same menu. The chosen
+track and volume are remembered. No recordings are bundled with the game; real
+songs stream from YouTube or come from your own collection.
 
 ## Rules implemented
 
@@ -56,5 +83,6 @@ the choice is remembered.
 - `index.html` – page structure
 - `style.css` – board and UI styling
 - `data.js` – squares, rents, card text
-- `audio.js` – synthesized sound effects and soundtrack
+- `audio.js` – sound effects, built-in soundtracks, song library
+- `music/` – optional folder for your own audio files and the playlist helper
 - `game.js` – rules engine and UI

@@ -181,20 +181,35 @@
   // =====================================================================
   // Modal
   // =====================================================================
-  function openModal(html, wide = false) {
+  let modalDismiss = null; // called when the user clicks outside, presses Escape or the ✕
+  function openModal(html, wide = false, onDismiss = null) {
     const card = $('#modal-card');
     card.className = wide ? 'wide' : '';
-    card.innerHTML = html;
+    card.innerHTML = `<div class="modal-body">${html}</div>`;
+    // Pin the action row to the bottom so it never scrolls out of view.
+    const actions = card.querySelector('.modal-actions');
+    if (actions) { const foot = document.createElement('div'); foot.className = 'modal-foot'; foot.appendChild(actions); card.appendChild(foot); }
+    modalDismiss = onDismiss;
+    if (onDismiss) {
+      const x = document.createElement('button');
+      x.className = 'modal-x'; x.title = 'Close'; x.textContent = '✕';
+      x.onclick = () => modalDismiss && modalDismiss();
+      card.appendChild(x);
+    }
     $('#modal').classList.remove('hidden');
+    card.querySelector('.modal-body').scrollTop = 0;
     return card;
   }
-  function closeModal() { $('#modal').classList.add('hidden'); }
+  function closeModal() { $('#modal').classList.add('hidden'); modalDismiss = null; }
+  $('#modal').addEventListener('mousedown', (e) => { if (e.target === e.currentTarget && modalDismiss) modalDismiss(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modalDismiss && !$('#modal').classList.contains('hidden')) modalDismiss(); });
 
   function ask(title, body, buttons, opts = {}) {
     return new Promise((resolve) => {
+      const single = buttons.length === 1 ? () => { closeModal(); resolve(buttons[0].value); } : null;
       const card = openModal(`<h3>${title}</h3>${body}<div class="modal-actions">${buttons
         .map((b, i) => `<button class="btn ${b.cls || ''}" data-i="${i}" ${b.disabled ? 'disabled' : ''}>${b.label}</button>`)
-        .join('')}</div>`, opts.wide);
+        .join('')}</div>`, opts.wide, single);
       card.querySelectorAll('.modal-actions button').forEach((btn) => {
         btn.onclick = () => { closeModal(); resolve(buttons[+btn.dataset.i].value); };
       });
@@ -290,11 +305,33 @@
     const diceEl = $('#dice');
     diceEl.title = 'Click to roll';
     diceEl.onclick = (e) => { e.stopPropagation(); if (!busy && !state.debt && state.phase === 'roll') rollDice(); };
-    const sfxBtn = $('#sfx-btn'), musicBtn = $('#music-btn');
-    const paint = () => { sfxBtn.classList.toggle('off', !Audio_.prefs.sfx); musicBtn.classList.toggle('off', !Audio_.prefs.music); };
+    const sfxBtn = $('#sfx-btn'), musicBtn = $('#music-btn'), nowPlaying = $('#now-playing');
+    const paint = () => {
+      sfxBtn.classList.toggle('off', !Audio_.prefs.sfx);
+      musicBtn.classList.toggle('off', !Audio_.prefs.music);
+      const t = Audio_.music.current();
+      nowPlaying.classList.toggle('paused', !Audio_.prefs.music);
+      const label = t ? (t.title || t.name) + (t.author && t.source === 'youtube' ? ' · ' + t.author : '') : 'Music';
+      nowPlaying.innerHTML = `<span class="note">${Audio_.prefs.music ? '♪' : '▮▮'}</span>${label}${Audio_.prefs.music ? '' : ' (music off)'}`;
+      $('#yt-wrap').classList.toggle('hidden', !(Audio_.prefs.music && Audio_.music.isYouTubeActive()));
+    };
     sfxBtn.onclick = () => { Audio_.init(); Audio_.toggleSfx(); paint(); };
-    musicBtn.onclick = () => { Audio_.init(); Audio_.toggleMusic(); paint(); };
+    musicBtn.onclick = () => { Audio_.init(); openMusicMenu(); };
+    nowPlaying.onclick = musicBtn.onclick;
+    Audio_.music.onChange(paint);
     paint();
+    // Drag and drop songs anywhere on the page
+    let dragDepth = 0;
+    document.addEventListener('dragenter', (e) => { if ([...e.dataTransfer.types].includes('Files')) { dragDepth++; document.body.classList.add('dragging-audio'); } });
+    document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging-audio'); } });
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', async (e) => {
+      e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging-audio');
+      if (!e.dataTransfer.files.length) return;
+      Audio_.init();
+      const n = await Audio_.music.addFiles(e.dataTransfer.files);
+      if (n) { log(`${n} song${n > 1 ? 's' : ''} added to the music library.`); render(); }
+    });
     $('#new-game-btn').onclick = async () => {
       if (await ask('Start a new game?', '<p>The current game will be erased.</p>', [{ label: 'Cancel', value: false }, { label: 'New game', value: true, cls: 'danger' }])) {
         localStorage.removeItem(SAVE_KEY);
@@ -818,7 +855,7 @@
       const card = openModal(`<h3>${p.token} ${p.name} — properties</h3>
         <p class="muted">Cash: <b>${fmt(p.money)}</b>${state.debt ? ` · Owed: <b style="color:var(--red)">${fmt(state.debt.amount)}</b>` : ''}</p>
         <div class="plist">${rows || '<p class="muted">You own nothing yet.</p>'}</div>
-        <div class="modal-actions"><button class="btn primary" id="mclose">Done</button></div>`);
+        <div class="modal-actions"><button class="btn primary" id="mclose">Done</button></div>`, false, () => { closeModal(); afterManage(); });
       card.querySelectorAll('[data-a]').forEach((b) => {
         b.onclick = () => {
           const i = +b.dataset.i, s = SQUARES[i], o = state.owners[i];
@@ -875,7 +912,7 @@
         <p>${p.token} ${p.name} trades with
           <select id="trade-partner">${others.map((qi) => `<option value="${qi}" ${qi === partner ? 'selected' : ''}>${state.players[qi].token} ${state.players[qi].name}</option>`).join('')}</select></p>
         <div class="trade-cols">${col(me, 'a')}${col(partner, 'b')}</div>
-        <div class="modal-actions"><button class="btn" id="tcancel">Cancel</button><button class="btn primary" id="tpropose">Propose trade</button></div>`, true);
+        <div class="modal-actions"><button class="btn" id="tcancel">Cancel</button><button class="btn primary" id="tpropose">Propose trade</button></div>`, true, () => { closeModal(); render(); });
       card.querySelector('#trade-partner').onchange = (e) => { partner = +e.target.value; render_(); };
       card.querySelector('#tcancel').onclick = () => { closeModal(); render(); };
       card.querySelector('#tpropose').onclick = async () => {
@@ -912,6 +949,94 @@
       };
     };
     render_();
+  }
+
+  // =====================================================================
+  // Music menu
+  // =====================================================================
+  let musicMenuOpen = false, musicMenuSig = '', musicMenuTyped = '';
+  function musicMenuSignature() {
+    const cur = Audio_.music.current();
+    return JSON.stringify([Audio_.prefs.music, cur && cur.id, Audio_.music.tracks().map((t) => [t.id, t.name, t.title, t.author, t.error, t.sub])]);
+  }
+  function closeMusicMenu() { musicMenuOpen = false; musicMenuSig = ''; musicMenuTyped = ''; closeModal(); render(); }
+  function openMusicMenu() {
+    if (musicMenuOpen) return;
+    if (!$('#modal').classList.contains('hidden')) return; // don't stack on top of a game prompt
+    musicMenuOpen = true;
+    musicMenuSig = '';
+    drawMusicMenu();
+  }
+  // Redraw only when something visible changed, so buttons are never swapped out under a click.
+  Audio_.music.onChange(() => { if (musicMenuOpen && musicMenuSignature() !== musicMenuSig) drawMusicMenu(); });
+
+  function drawMusicMenu() {
+    if (!musicMenuOpen) return;
+    const prev = $('#yt-url'); if (prev) musicMenuTyped = prev.value;
+    const prevBody = $('#modal-card .modal-body'); const keepScroll = prevBody ? prevBody.scrollTop : 0;
+    musicMenuSig = musicMenuSignature();
+    const cur = Audio_.music.current();
+    const on = Audio_.prefs.music;
+    const row = (t) => {
+      const isCur = cur && cur.id === t.id;
+      const err = t.error === true ? 'Could not play this file' : (typeof t.error === 'string' ? t.error : '');
+      const name = t.source === 'youtube' && t.title ? t.title : t.name;
+      const sub = t.source === 'youtube' && t.author && !t.preset ? t.author : t.sub || '';
+      return `<button class="track ${isCur ? 'active' : ''} ${err ? 'error' : ''}" data-play="${t.id}">
+        <span class="tplay">${isCur && on ? '▶' : '♪'}</span>
+        <span class="tinfo"><span class="tname">${name}${t.source === 'youtube' ? '<span class="yt-badge">YouTube</span>' : ''}</span><span class="tsub ${err ? 'err' : ''}">${err || sub}</span></span>
+        ${t.source === 'library' ? `<span class="tdel" data-del="${t.id}" title="Remove from library">✕</span>` : ''}
+        ${t.source === 'youtube' && !t.preset ? `<span class="tdel" data-ytdel="${t.id}" title="Remove">✕</span>` : ''}
+      </button>`;
+    };
+    const tracks = Audio_.music.tracks();
+    const synth = tracks.filter((t) => t.source === 'synth'), mine = tracks.filter((t) => t.source === 'library' || t.source === 'folder'), yts = tracks.filter((t) => t.source === 'youtube');
+    const card = openModal(`<div class="music-menu"><h3>🎵 Music</h3>
+      <div class="music-controls">
+        <button class="btn ${on ? '' : 'primary'}" id="m-toggle">${on ? '⏸ Pause music' : '▶ Play music'}</button>
+        <button class="btn" id="m-next" ${on ? '' : 'disabled'}>⏭ Next</button>
+        <span class="muted">Volume</span><input type="range" id="m-vol" min="0" max="1" step="0.05" value="${Audio_.prefs.volume}">
+      </div>
+      <div class="section">Built-in soundtracks (synthesized)</div>
+      <div class="tracks">${synth.map(row).join('')}</div>
+      <div class="section">Real songs from YouTube</div>
+      ${Audio_.music.ytOnFile ? '<p class="yt-note warn">YouTube only plays when the game is served from localhost. Quit this tab and double-click <b>play.command</b> in the game folder, which starts a tiny local server and opens the game.</p>' : '<p class="yt-note">Streams through YouTube\'s own player (needs internet). Paste any YouTube video or playlist link to add it.</p>'}
+      <div class="yt-add"><input id="yt-url" type="text" placeholder="Paste a YouTube link or playlist link…"><button class="btn primary" id="yt-addbtn">Add</button></div>
+      <div class="tracks">${yts.map(row).join('')}</div>
+      <div class="section">Your songs</div>
+      <div class="tracks">${mine.map(row).join('') || '<p class="muted" style="margin:0 0 6px">No local files yet. Add MP3s or other audio from your own collection.</p>'}</div>
+      <div class="add-songs" id="m-drop">
+        <button class="btn primary" id="m-add">＋ Add songs from your Mac</button>
+        <input type="file" id="m-file" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav,.flac" multiple hidden>
+        <div>or drag MP3 / M4A / WAV files anywhere onto the game. Songs are stored in this browser and never leave your computer.</div>
+      </div>
+      <div class="modal-actions"><button class="btn primary" id="m-close">Done</button></div></div>`, false, closeMusicMenu);
+    card.querySelector('.modal-body').scrollTop = keepScroll;
+    card.querySelector('#m-close').onclick = closeMusicMenu;
+    card.querySelector('#m-toggle').onclick = () => Audio_.music.setEnabled(!Audio_.prefs.music);
+    card.querySelector('#m-next').onclick = () => Audio_.music.next();
+    card.querySelector('#m-vol').oninput = (e) => Audio_.music.setVolume(+e.target.value);
+    const ytInput = card.querySelector('#yt-url');
+    ytInput.value = musicMenuTyped;
+    const addYt = async () => {
+      const val = ytInput.value;
+      if (!Audio_.music.parseYouTube(val)) { ytInput.style.borderColor = 'var(--red)'; ytInput.placeholder = 'That does not look like a YouTube link'; ytInput.value = ''; return; }
+      ytInput.value = ''; musicMenuTyped = '';
+      const t = await Audio_.music.addYouTube(val);
+      if (t) { if (!Audio_.prefs.music) Audio_.music.setEnabled(true); Audio_.music.play(t.id); log(`YouTube track added: ${t.name}.`); }
+    };
+    card.querySelector('#yt-addbtn').onclick = addYt;
+    ytInput.onkeydown = (e) => { if (e.key === 'Enter') addYt(); };
+    card.querySelectorAll('[data-ytdel]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); Audio_.music.removeYouTube(b.dataset.ytdel); });
+    card.querySelectorAll('[data-play]').forEach((b) => b.onclick = (e) => {
+      if (e.target.closest('[data-del],[data-ytdel]')) return;
+      if (!Audio_.prefs.music) Audio_.music.setEnabled(true);
+      Audio_.music.play(b.dataset.play);
+    });
+    card.querySelectorAll('[data-del]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); Audio_.music.removeSong(b.dataset.del); });
+    const fileInput = card.querySelector('#m-file');
+    card.querySelector('#m-add').onclick = () => fileInput.click();
+    fileInput.onchange = async () => { const n = await Audio_.music.addFiles(fileInput.files); if (n) log(`${n} song${n > 1 ? 's' : ''} added to the music library.`); };
   }
 
   // =====================================================================
