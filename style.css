@@ -189,10 +189,45 @@ h1, h2, h3, .deed .deed-head .name, #center .title, #center .subtitle, .setup-ca
   border: .35em solid transparent;
 }
 .sq.mortgaged .body { opacity: .4; }
-.sq.mortgaged::after {
-  content: 'MORTGAGED';
-  position: absolute; inset: auto 0 0 0; font-size: .8em; text-align: center; background: rgba(0,0,0,.6); color: #fff; letter-spacing: 1px;
+
+/* Owner ribbon on the outer edge of each owned square */
+.owner-strip {
+  position: absolute;
+  display: none;
+  align-items: center; justify-content: center; gap: .3em;
+  background: var(--pc);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.05em;
+  letter-spacing: .03em;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  box-shadow: inset 0 0 0 .12em rgba(255,255,255,.55);
+  z-index: 1;
+  overflow: hidden;
+  white-space: nowrap;
 }
+.sq.owned .owner-strip { display: flex; }
+.owner-strip .ot { font-size: 1.15em; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+.owner-strip .on { overflow: hidden; text-overflow: ellipsis; max-width: 75%; text-transform: uppercase; font-size: .85em; }
+.sq { --strip: 2.2em; }
+.sq.side-bottom .owner-strip { left: 0; right: 0; bottom: 0; height: var(--strip); }
+.sq.side-top .owner-strip { left: 0; right: 0; top: 0; height: var(--strip); }
+.sq.side-left .owner-strip { top: 0; bottom: 0; left: 0; width: var(--strip); flex-direction: column; }
+.sq.side-right .owner-strip { top: 0; bottom: 0; right: 0; width: var(--strip); flex-direction: column; }
+/* push square content away from the ribbon */
+.sq.side-bottom.owned .body { padding-bottom: calc(var(--strip) + .2em); }
+.sq.side-top.owned .body { padding-top: calc(var(--strip) + .2em); }
+.sq.side-left.owned .body { padding-left: calc(var(--strip) + .2em); }
+.sq.side-right.owned .body { padding-right: calc(var(--strip) + .2em); }
+.sq.mortgaged .owner-strip {
+  background: repeating-linear-gradient(135deg, var(--pc) 0 .5em, #2a1f1c .5em 1em);
+}
+.sq.owned .owner-tag { border-width: .3em; }
+
+/* keep player tokens clear of the ribbon */
+.sq.side-bottom.owned .tokens { bottom: calc(var(--strip) + .15em); }
+.sq.side-left.owned .tokens { left: calc(var(--strip) + .15em); }
+.sq.side-right.owned .tokens { right: calc(var(--strip) + .15em); }
 
 .houses { display: flex; gap: .15em; }
 .house { width: .9em; height: .9em; background: var(--green); border: 1px solid #124; border-radius: 2px; }

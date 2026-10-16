@@ -268,7 +268,7 @@
       } else {
         body = `<div class="body"><div class="name">${s.name}</div><div class="icon">${ICONS[s.type]}</div><div class="kname">${s.kurdish || ''}</div></div>`;
       }
-      el.innerHTML = body + `<div class="owner-tag"></div><div class="tokens"></div>`;
+      el.innerHTML = body + `<div class="owner-tag"></div>${['property', 'railroad', 'utility'].includes(s.type) ? '<div class="owner-strip"></div>' : ''}<div class="tokens"></div>`;
       el.onclick = () => showSquareInfo(i);
       board.appendChild(el);
     });
@@ -329,8 +329,16 @@
       const o = state.owners[i];
       const tag = el.querySelector('.owner-tag');
       if (o) {
-        tag.style.borderColor = o.owner == null ? 'transparent' : state.players[o.owner].color;
+        const owner = o.owner == null ? null : state.players[o.owner];
+        tag.style.borderColor = owner ? owner.color : 'transparent';
+        el.classList.toggle('owned', !!owner);
         el.classList.toggle('mortgaged', o.mortgaged);
+        const strip = el.querySelector('.owner-strip');
+        strip.style.setProperty('--pc', owner ? owner.color : 'transparent');
+        const side = squarePos(i).side;
+        const narrow = side === 'left' || side === 'right';
+        strip.innerHTML = owner ? `<span class="ot">${owner.token}</span>${narrow ? '' : `<span class="on">${o.mortgaged ? '🔒 ' : ''}${owner.name}</span>`}` : '';
+        strip.title = owner ? `Owned by ${owner.name}${o.mortgaged ? ' (mortgaged)' : ''}` : '';
         const hs = el.querySelector('.houses');
         if (hs) hs.innerHTML = o.houses === 5 ? '<div class="hotel"></div>' : '<div class="house"></div>'.repeat(o.houses);
       }
