@@ -27,6 +27,36 @@ html, body {
     var(--zigzag),
     var(--cream);
 }
+/* ---------- Persia theme palette ---------- */
+body[data-theme="persian"] {
+  --red: #c0392b;
+  --green: #0f7b6c;
+  --yellow: #e0b341;
+  --cream: #f4efe4;
+  --board: #eef3f0;
+  --dark: #142c6b;
+  --kilim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%231b3b8a'/%3E%3Cpolygon points='24.0 4.0 29.9 9.9 38.1 9.9 38.1 18.1 44.0 24.0 38.1 29.9 38.1 38.1 29.9 38.1 24.0 44.0 18.1 38.1 9.9 38.1 9.9 29.9 4.0 24.0 9.9 18.1 9.9 9.9 18.1 9.9' fill='%232ab7b0' stroke='%23e0b341' stroke-width='1.5'/%3E%3Cpolygon points='24.0 15.0 26.6 17.6 30.4 17.6 30.4 21.4 33.0 24.0 30.4 26.6 30.4 30.4 26.6 30.4 24.0 33.0 21.4 30.4 17.6 30.4 17.6 26.6 15.0 24.0 17.6 21.4 17.6 17.6 21.4 17.6' fill='%23f4efe4'/%3E%3Ccircle cx='24' cy='24' r='2.2' fill='%23c0392b'/%3E%3Cpath d='M0 0h6v6H0zM42 0h6v6h-6zM0 42h6v6H0zM42 42h6v6h-6z' fill='%23e0b341'/%3E%3C/svg%3E");
+  --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cpolygon points='100.0 4.0 128.1 32.2 167.9 32.1 167.8 71.9 196.0 100.0 167.8 128.1 167.9 167.9 128.1 167.8 100.0 196.0 71.9 167.8 32.1 167.9 32.2 128.1 4.0 100.0 32.2 71.9 32.1 32.1 71.9 32.2' fill='%23e0b341'/%3E%3Cpolygon points='100.0 16.0 124.6 40.6 159.4 40.6 159.4 75.4 184.0 100.0 159.4 124.6 159.4 159.4 124.6 159.4 100.0 184.0 75.4 159.4 40.6 159.4 40.6 124.6 16.0 100.0 40.6 75.4 40.6 40.6 75.4 40.6' fill='%232ab7b0'/%3E%3Cpolygon points='121.4 48.3 130.3 69.7 151.7 78.6 142.8 100.0 151.7 121.4 130.3 130.3 121.4 151.7 100.0 142.8 78.6 151.7 69.7 130.3 48.3 121.4 57.2 100.0 48.3 78.6 69.7 69.7 78.6 48.3 100.0 57.2' fill='%23f4efe4'/%3E%3Cpolygon points='100.0 66.0 109.9 76.0 124.0 76.0 124.0 90.1 134.0 100.0 124.0 109.9 124.0 124.0 109.9 124.0 100.0 134.0 90.1 124.0 76.0 124.0 76.0 109.9 66.0 100.0 76.0 90.1 76.0 76.0 90.1 76.0' fill='%23c0392b'/%3E%3Ccircle cx='100' cy='100' r='11' fill='%23e0b341'/%3E%3C/svg%3E");
+}
+body[data-theme="persian"] .sun-emblem { background: var(--star) center/contain no-repeat; border-radius: 0; }
+body[data-theme="persian"] .sun-emblem::before { display: none; }
+#center .star { width: 32%; aspect-ratio: 1; background: var(--star) center/contain no-repeat; filter: drop-shadow(0 .2em .5em rgba(0,0,0,.35)); }
+body[data-theme="persian"] #center .title-ku { color: #e0b341; }
+body[data-theme="persian"] .token { border-width: .18em; }
+
+/* ---------- Theme chooser (setup) ---------- */
+.theme-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.theme-card {
+  border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; background: #fff; text-align: left; font-family: inherit;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.theme-card:hover { border-color: var(--yellow); }
+.theme-card.active { border-color: var(--green); background: #eef7f1; box-shadow: inset 0 0 0 1px var(--green); }
+.theme-card .tc-strip { height: 10px; border-radius: 5px; background-size: 20px 20px; border: 1px solid rgba(0,0,0,.25); }
+.theme-card .tc-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+.theme-card .tc-sub { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.theme-card .tc-tokens { font-size: 16px; letter-spacing: 2px; }
+
 h1, h2, h3, .deed .deed-head .name, #center .title, #center .subtitle, .setup-card h1 { font-family: var(--display); }
 .kilim-strip { height: 14px; background: var(--kilim); background-size: 28px 28px; border-top: 2px solid var(--dark); border-bottom: 2px solid var(--dark); }
 .setup-card .kilim-strip { margin: -24px -28px 0; border-radius: 16px 16px 0 0; height: 18px; border-top: 0; }

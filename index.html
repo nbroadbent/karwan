@@ -13,12 +13,17 @@
     <div class="setup-card">
       <div class="kilim-strip top"></div>
       <div class="sun-emblem big"></div>
-      <h1>Kurdistan Monopoly</h1>
-      <p class="tagline">Buy, build and trade your way across Bashur, Rojava, Rojhelat and Bakur.</p>
+      <h1 id="setup-title">Kurdistan Monopoly</h1>
+      <p class="tagline" id="setup-tagline">Buy, build and trade your way across Bashur, Rojava, Rojhelat and Bakur.</p>
 
       <div id="resume-box" class="hidden">
         <button id="resume-btn" class="btn primary">Resume saved game</button>
         <span class="muted">or start a new one below</span>
+      </div>
+
+      <div class="field">
+        <label>Theme</label>
+        <div id="theme-pick" class="theme-pick"></div>
       </div>
 
       <div class="field">
@@ -40,7 +45,7 @@
       </div>
 
       <button id="start-btn" class="btn primary large">Start Game</button>
-      <p class="muted" style="margin:10px 0 0">Sound and music play once the game starts. Use 🎵 in the side panel to pick a soundtrack or add your own Kurdish songs.</p>
+      <p class="muted" style="margin:10px 0 0">Sound and music play once the game starts. Use 🎵 in the side panel to pick a soundtrack, stream songs from YouTube or add your own.</p>
       <div class="kilim-strip bottom"></div>
     </div>
   </div>
@@ -51,8 +56,8 @@
       <button class="panel-toggle" id="toggle-left" title="Collapse panel">◀</button>
       <div id="place-empty">
         <div class="pe-icon">🗺️</div>
-        <h3>Discover Kurdistan</h3>
-        <p>Click any square on the board to see a photo and the story of that place. The panel also follows each player as they land.</p>
+        <h3 id="discover-title">Discover Kurdistan</h3>
+        <p id="discover-text">Click any square on the board to see a photo and the story of that place. The panel also follows each player as they land.</p>
       </div>
       <div id="place-content" class="hidden"></div>
     </aside>
@@ -62,7 +67,7 @@
       <button class="panel-toggle" id="toggle-right" title="Collapse panel">▶</button>
       <div class="panel-head">
         <div class="sun-emblem small"></div>
-        <h2>Kurdistan Monopoly</h2>
+        <h2 id="panel-title">Kurdistan Monopoly</h2>
         <div class="audio-btns">
           <button id="sfx-btn" class="btn ghost small" title="Sound effects">🔊</button>
           <button id="music-btn" class="btn ghost small" title="Music: choose a soundtrack or add your own songs">🎵</button>
@@ -100,8 +105,11 @@
     <div id="modal-card"></div>
   </div>
 
+  <script src="themes/kurdish.js"></script>
+  <script src="themes/persian.js"></script>
   <script src="data.js"></script>
-  <script src="images/manifest.js"></script>
+  <script src="images/kurdish/manifest.js"></script>
+  <script src="images/persian/manifest.js"></script>
   <script src="music/playlist.js"></script>
   <script src="audio.js"></script>
   <script src="game.js"></script>

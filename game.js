@@ -16,12 +16,44 @@
   // =====================================================================
   let playerCount = 3;
 
+  function applyThemeToDom() {
+    document.title = THEME.title;
+    $('#setup-title').textContent = THEME.title;
+    $('#setup-tagline').textContent = THEME.tagline;
+    $('#panel-title').textContent = THEME.title;
+    $('#discover-title').textContent = THEME.discover;
+    $('#discover-text').textContent = THEME.discoverText;
+    document.querySelectorAll('.theme-card').forEach((c) => c.classList.toggle('active', c.dataset.theme === THEME.id));
+    if (typeof Audio_ !== 'undefined' && Audio_.setTheme) Audio_.setTheme(THEME);
+  }
+  function chooseTheme(id) {
+    applyTheme(id);
+    localStorage.setItem('kurdistan-monopoly-theme', id);
+    applyThemeToDom();
+    setupTokens.length = 0;
+    renderPlayerRows();
+  }
+  function renderThemePick() {
+    const wrap = $('#theme-pick');
+    wrap.innerHTML = THEME_IDS.map((id) => {
+      const t = THEMES[id];
+      const strip = `background: ${id === 'kurdish' ? 'repeating-linear-gradient(90deg,#ed2024 0 10px,#fff 10px 20px,#278e43 20px 30px,#febd11 30px 40px)' : 'repeating-linear-gradient(90deg,#1b3b8a 0 10px,#2ab7b0 10px 20px,#e0b341 20px 30px,#c0392b 30px 40px)'}`;
+      return `<button class="theme-card" data-theme="${id}"><div class="tc-strip" style="${strip}"></div><div class="tc-name">${t.name} <span class="muted" style="font-weight:400;font-size:12px">· ${t.center.script}</span></div><div class="tc-sub">${t.tagline}</div><div class="tc-tokens">${t.tokens.slice(0, 6).join('')}</div></button>`;
+    }).join('');
+    wrap.querySelectorAll('.theme-card').forEach((b) => b.onclick = () => chooseTheme(b.dataset.theme));
+  }
+
   function initSetup() {
+    renderThemePick();
+    applyThemeToDom();
     if (localStorage.getItem(SAVE_KEY)) $('#resume-box').classList.remove('hidden');
     $('#resume-btn').onclick = () => {
       Audio_.init();
       try {
         state = JSON.parse(localStorage.getItem(SAVE_KEY));
+        applyTheme(state.theme || 'kurdish');
+        localStorage.setItem('kurdistan-monopoly-theme', THEME.id);
+        applyThemeToDom();
         startGameScreen();
       } catch (e) {
         alert('Saved game could not be loaded.');
@@ -87,6 +119,7 @@
       });
     }
     state = {
+      theme: THEME.id,
       players,
       owners: SQUARES.map((s) => (['property', 'railroad', 'utility'].includes(s.type) ? { owner: null, houses: 0, mortgaged: false } : null)),
       turn: 0,
@@ -263,8 +296,8 @@
     let note = '';
     if (o) note = o.owner == null ? `For sale · ${fmt(s.price)}` : o.owner === state.turn ? 'Your own property' : `Owned by ${state.players[o.owner].token} ${state.players[o.owner].name}${o.mortgaged ? ' · mortgaged' : ''}`;
     else if (s.type === 'tax') note = `Pay ${fmt(s.amount)}`;
-    else if (s.type === 'chance') note = 'Draw a Newroz card';
-    else if (s.type === 'chest') note = 'Draw a Dîwan card';
+    else if (s.type === 'chance') note = `Draw a ${THEME.chance.name} card`;
+    else if (s.type === 'chest') note = `Draw a ${THEME.chest.name} card`;
     else if (s.type === 'gotojail') note = 'Straight to jail!';
     else if (s.type === 'parking') note = state.opts.parking && state.pot ? `Collect the ${fmt(state.pot)} pot` : 'Free rest';
     else if (s.type === 'jail') note = 'Just visiting';
@@ -317,7 +350,7 @@
     if (i <= 30) return { row: 1, col: 1 + (i - 20), side: 'top' };
     return { row: 1 + (i - 30), col: 11, side: 'right' };
   }
-  const ICONS = { go: '➜', chest: '🪔', chance: '🔥', tax: '💰', railroad: '🛂', utility: '⚡', jail: '🔒', parking: '🌳', gotojail: '👮' };
+  const ICONS = new Proxy({}, { get: (_, k) => (k === 'chance' ? THEME.chance.icon : k === 'chest' ? THEME.chest.icon : (THEME.icons || {})[k] || { go: '➜', tax: '💰', railroad: '🛂', utility: '⚡', jail: '🔒', parking: '🌳', gotojail: '👮' }[k]) });
 
   function buildBoard() {
     const board = $('#board');
@@ -341,7 +374,7 @@
       } else if (s.type === 'tax') {
         body = `<div class="body"><div class="name">${s.name}</div><div class="icon">${ICONS.tax}</div><div class="price">Pay ${fmt(s.amount)}</div></div>`;
       } else if (s.type === 'chance' || s.type === 'chest') {
-        body = `<div class="body"><div class="name">${s.name}</div><div class="icon">${ICONS[s.type]}</div><div class="kname">${s.type === 'chance' ? 'Chance' : 'Community'}</div></div>`;
+        body = `<div class="body"><div class="name">${s.name}</div><div class="icon">${ICONS[s.type]}</div><div class="kname">${s.type === 'chance' ? THEME.chance.sub : THEME.chest.sub}</div></div>`;
       } else if (s.type === 'go') {
         body = `<div class="body"><div class="kname">Collect ${fmt(GO_SALARY)}</div><div class="name">GO</div><div class="icon">${ICONS.go}</div><div class="kname">${s.kurdish}</div></div>`;
       } else {
@@ -353,16 +386,17 @@
     });
     const center = document.createElement('div');
     center.id = 'center';
-    center.innerHTML = `<div class="flag">
+    const C = THEME.center, M = C.mountains;
+    center.innerHTML = `<div class="flag" style="background:${C.bands}">
         <div class="ornament tl"></div><div class="ornament tr"></div>
-        <div class="title">Kurdistan</div><div class="title-ku">کوردستان</div>
-        <div class="sun"></div>
+        <div class="title">${C.title}</div><div class="title-ku">${C.script}</div>
+        <div class="${C.emblem === 'star' ? 'star' : 'sun'}"></div>
         <svg class="mountains" viewBox="0 0 400 90" preserveAspectRatio="none">
-          <path d="M0 90 L0 62 L30 40 L55 55 L90 22 L120 48 L150 30 L175 44 L205 12 L240 42 L270 28 L300 50 L330 24 L360 46 L400 30 L400 90 Z" fill="#1d6a33"/>
-          <path d="M0 90 L0 75 L40 60 L80 72 L120 58 L160 70 L200 52 L250 68 L290 56 L340 70 L400 58 L400 90 Z" fill="#154f26"/>
-          <path d="M205 12 L195 24 L215 24 Z M90 22 L82 32 L98 32 Z M330 24 L322 34 L338 34 Z" fill="#fff" opacity=".9"/>
+          <path d="M0 90 L0 62 L30 40 L55 55 L90 22 L120 48 L150 30 L175 44 L205 12 L240 42 L270 28 L300 50 L330 24 L360 46 L400 30 L400 90 Z" fill="${M.back}"/>
+          <path d="M0 90 L0 75 L40 60 L80 72 L120 58 L160 70 L200 52 L250 68 L290 56 L340 70 L400 58 L400 90 Z" fill="${M.front}"/>
+          <path d="M205 12 L195 24 L215 24 Z M90 22 L82 32 L98 32 Z M330 24 L322 34 L338 34 Z" fill="${M.snow}" opacity=".9"/>
         </svg>
-        <div class="subtitle">MONOPOLY</div>
+        <div class="subtitle">${C.subtitle}</div>
       </div>
       <div id="dice"><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div><div class="die" data-v="1">${'<span></span>'.repeat(9)}</div></div>
       <div id="dice-hint"></div>`;
@@ -512,7 +546,7 @@
     const sqEl = document.querySelector(`.sq[data-i="${i}"]`); if (sqEl) sqEl.classList.add('selected');
     const color = s.group ? GROUPS[s.group].color : s.type === 'railroad' ? '#333' : s.type === 'utility' ? '#777' : 'var(--yellow)';
     const o = state.owners[i];
-    const region = s.region || (s.type === 'railroad' ? 'Border crossing' : s.type === 'utility' ? 'Utility' : 'Kurdistan');
+    const region = s.region || (s.type === 'railroad' ? (s.kurdish || 'Crossing') : s.type === 'utility' ? 'Utility' : THEME.name);
     let facts = '';
     if (o) {
       const ownerTxt = o.owner == null ? 'Unowned' : `${state.players[o.owner].token} ${state.players[o.owner].name}`;
@@ -570,7 +604,7 @@
     };
 
     // 1) Local photos from the images/ folder win (work offline)
-    const local = (window.LOCAL_IMAGES || {})[s.name];
+    const local = ((window.LOCAL_IMAGES || {})[THEME.id] || {})[s.name];
     if (local && local.length) {
       localShown = true;
       showGallery(local.map((p) => ({ src: p.file, thumb: p.file, page: p.source, title: p.title, caption: p.author ? `${p.author}${p.license ? ' · ' + p.license : ''}` : p.title })));
@@ -619,8 +653,8 @@
       parking: state.opts.parking ? `Land here to collect the pot. Currently ${fmt(state.pot)}.` : 'A free rest in the mountains.',
       gotojail: 'Go directly to Jail. Do not pass GO.',
       tax: `Pay ${fmt(s.amount || 0)} to the bank.`,
-      chance: 'Draw a Newroz card.',
-      chest: 'Draw a Dîwan card.',
+      chance: `Draw a ${THEME.chance.name} card.`,
+      chest: `Draw a ${THEME.chest.name} card.`,
     }[s.type] || '';
     notify(s.name, `<p>${desc}</p>${mapLink(s.name)}`, 'Close');
   }
@@ -1065,11 +1099,12 @@
     const card = cards[idx];
     if (card.action !== 'jailCard') deck.push(idx); else state[kind + 'Held'] = (state[kind + 'Held'] || 0) + 1;
     const p = cur(), pi = state.turn;
-    const colors = kind === 'chance' ? ['#ed2024', '#f28c28'] : ['#278e43', '#1d3f8f'];
-    log(`${p.name} draws a ${kind === 'chance' ? 'Newroz' : 'Dîwan'} card: “${card.text}”`);
+    const deckInfo = kind === 'chance' ? THEME.chance : THEME.chest;
+    const colors = deckInfo.colors;
+    log(`${p.name} draws a ${deckInfo.name} card: “${card.text}”`);
     Audio_.play('card');
-    await notify(kind === 'chance' ? 'Newroz card' : 'Dîwan card',
-      `<div class="drawn-card" style="--c1:${colors[0]};--c2:${colors[1]}"><div class="kind">${kind === 'chance' ? 'Newroz · Chance' : 'Dîwan · Community'}</div><div class="ctext">${card.text}</div></div>`);
+    await notify(`${deckInfo.name} card`,
+      `<div class="drawn-card" style="--c1:${colors[0]};--c2:${colors[1]}"><div class="kind">${deckInfo.name} · ${deckInfo.sub}</div><div class="ctext">${card.text}</div></div>`);
 
     switch (card.action) {
       case 'moveTo': await moveTo(card.target); return landOn(p.pos);
@@ -1324,7 +1359,7 @@
       if (!Audio_.music.parseYouTube(val)) { ytInput.style.borderColor = 'var(--red)'; ytInput.placeholder = 'That does not look like a YouTube link'; ytInput.value = ''; return; }
       ytInput.value = ''; musicMenuTyped = '';
       const t = await Audio_.music.addYouTube(val);
-      if (t) { if (!Audio_.prefs.music) Audio_.music.setEnabled(true); Audio_.music.play(t.id); log(`YouTube track added: ${t.name}.`); }
+      if (t) { if (!Audio_.prefs.music) Audio_.music.setEnabled(true); Audio_.music.choose(t.id); log(`YouTube track added: ${t.name}.`); }
     };
     card.querySelector('#yt-addbtn').onclick = addYt;
     ytInput.onkeydown = (e) => { if (e.key === 'Enter') addYt(); };
@@ -1332,7 +1367,7 @@
     card.querySelectorAll('[data-play]').forEach((b) => b.onclick = (e) => {
       if (e.target.closest('[data-del],[data-ytdel]')) return;
       if (!Audio_.prefs.music) Audio_.music.setEnabled(true);
-      Audio_.music.play(b.dataset.play);
+      Audio_.music.choose(b.dataset.play);
     });
     card.querySelectorAll('[data-del]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); Audio_.music.removeSong(b.dataset.del); });
     const fileInput = card.querySelector('#m-file');
@@ -1387,7 +1422,7 @@
     state.phase = 'over';
     Audio_.play('win');
     render();
-    openModal(`<div class="winner"><div class="trophy">🏆</div><h3>${w.token} ${w.name} rules Kurdistan!</h3>
+    openModal(`<div class="winner"><div class="trophy">🏆</div><h3>${w.token} ${w.name} ${THEME.winText}</h3>
       <p>Final worth: ${fmt(netWorth(pIdx(w)))}</p>
       <div class="modal-actions" style="justify-content:center"><button class="btn primary" id="wnew">New game</button></div></div>`);
     $('#wnew').onclick = () => { localStorage.removeItem(SAVE_KEY); location.reload(); };

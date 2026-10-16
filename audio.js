@@ -22,7 +22,10 @@ const Audio_ = (() => {
     master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
     sfxGain = ctx.createGain(); sfxGain.gain.value = prefs.sfx ? 1 : 0; sfxGain.connect(master);
     musicGain = ctx.createGain(); musicGain.gain.value = synthVol(); musicGain.connect(master);
-    loadUserSongs().then(() => { if (prefs.music) playTrack(prefs.track, false); });
+    loadUserSongs().then(() => {
+      if (!allTracks().some((t) => t.id === prefs.track)) { prefs.track = 'govend'; savePrefs(); }
+      if (prefs.music) playTrack(prefs.track, false);
+    });
   }
   const synthVol = () => (prefs.music ? 0.55 * prefs.volume : 0);
 
@@ -178,6 +181,34 @@ const Audio_ = (() => {
         'F#4', 'A4', 'G4', 'F#4', 'E4', 'D4', 'E4', 'F#4',
         'D4', '-', '-', '-', 'A3', '-', 'D4', '-'],
     },
+    {
+      id: 'shur', name: 'Shur', sub: 'Persian · Dastgah-e Shur lament · kamancheh and tar over a drone',
+      slot: 0.36, bar: 6, rhythm: 'D....t', lead: 'bow', leadVol: 0.5, second: 'pluck',
+      drone: ['D3', 'A3'], droneVol: 0.7,
+      melody: [
+        'A4', '-', 'Bb4', 'A4', 'G4', '-',
+        'F4', '-', 'G4', 'A4', 'G4', 'F4',
+        'Eb4', 'F4', 'G4', '-', 'F4', 'Eb4',
+        'D4', '-', '-', 'C4', 'D4', '-',
+        'F4', 'G4', 'A4', '-', 'Bb4', 'A4',
+        'C5', '-', 'Bb4', 'A4', 'G4', 'F4',
+        'G4', '-', 'F4', 'Eb4', 'D4', 'Eb4',
+        'D4', '-', '-', '-', null, null],
+    },
+    {
+      id: 'bandari', name: 'Bandari', sub: 'Persian Gulf dance · 6/8 · ney-anban reed and tombak',
+      slot: 0.165, bar: 6, rhythm: 'DtDtDt', lead: 'reed', leadVol: 0.4,
+      drone: ['D3'],
+      melody: [
+        'D4', 'Eb4', 'F#4', 'G4', 'A4', '-',
+        'G4', 'F#4', 'Eb4', 'D4', '-', '-',
+        'A4', 'Bb4', 'A4', 'G4', 'F#4', 'G4',
+        'A4', '-', '-', 'G4', 'F#4', 'Eb4',
+        'D4', 'F#4', 'A4', 'D5', 'C5', 'Bb4',
+        'A4', 'G4', 'F#4', 'G4', 'A4', '-',
+        'Bb4', 'A4', 'G4', 'F#4', 'Eb4', 'F#4',
+        'D4', '-', '-', 'D4', '-', '-'],
+    },
   ];
 
   let synthTimer = null, nextSlot = 0, slotIndex = 0, synthTrack = null;
@@ -271,18 +302,21 @@ const Audio_ = (() => {
   // =====================================================================
   // YouTube: stream real songs through YouTube's embedded player
   // =====================================================================
-  // Starter list of Kurdish songs. Many official label uploads have embedding
-  // disabled by their owners, so these are uploads verified to play embedded.
-  const YT_PRESETS = [
-    { v: 'jYKb8xmcUQ4', name: 'Kîne Em', sub: 'Şivan Perwer' },
-    { v: '34rewThPFyw', name: 'Keçe Kurdan (live in Chicago)', sub: 'Aynur Doğan' },
-    { v: 'bpY2F0t3ZFw', name: 'Balangar', sub: 'Hesen Zîrek' },
-    { v: 'OK4wcO-uAng', name: 'Ey Reqîb', sub: 'Kurdish anthem' },
-    { v: 'bhbZ6U2EGA8', name: 'Lorke', sub: 'Kurdish Echoes' },
-    { v: 'DJEBukQ8D-M', name: 'Lorke Lorke', sub: 'Zozan C.' },
-    { v: 'tVyV21gdLHQ', name: 'Şad û Helperkê', sub: 'Hêlîn Music · dance album, 37 min' },
-    { v: '3qdHQHxsf6g', name: 'Kurdish Folk Mix', sub: 'Kurdish Folk Stran · 18 min' },
-  ];
+  // YouTube starter list comes from the active theme (see themes/*.js)
+  let YT_PRESETS = [];
+  function setTheme(theme) {
+    YT_PRESETS = theme.youtube || [];
+    for (const k of Object.keys(ytCache)) if (ytCache[k].preset) delete ytCache[k];
+    const ids = allTracks().map((t) => t.id);
+    const isLibrary = /^(song-|folder-)/.test(prefs.track || ''); // own songs load later, don't discard them here
+    // follow the theme's soundtrack unless the player picked a track themselves
+    if ((!ids.includes(prefs.track) && !isLibrary) || !prefs.trackChosen) {
+      prefs.track = theme.defaultTrack || 'govend'; savePrefs();
+      if (prefs.music && ctx && current && current.id !== prefs.track) playTrack(prefs.track, false);
+    }
+    emit();
+  }
+  function choose(id) { prefs.trackChosen = true; playTrack(id); }
   let ytUser = JSON.parse(localStorage.getItem(YT_KEY) || '[]');
   const saveYt = () => localStorage.setItem(YT_KEY, JSON.stringify(ytUser));
   const ytId = (t) => 'yt-' + (t.list ? 'list-' + t.list : t.v);
@@ -470,9 +504,9 @@ const Audio_ = (() => {
   function toggleSfx() { prefs.sfx = !prefs.sfx; if (sfxGain) sfxGain.gain.value = prefs.sfx ? 1 : 0; savePrefs(); if (prefs.sfx) play('click'); emit(); return prefs.sfx; }
 
   return {
-    init, play, toggleSfx, prefs,
+    init, play, toggleSfx, prefs, setTheme,
     music: {
-      tracks: allTracks, current: () => current, play: playTrack, next, prev, setEnabled: setMusic, toggle: () => setMusic(!prefs.music), setVolume,
+      tracks: allTracks, current: () => current, play: playTrack, choose, next, prev, setEnabled: setMusic, toggle: () => setMusic(!prefs.music), setVolume,
       ytState: () => (ytReady && yt.getPlayerState ? yt.getPlayerState() : null),
       ytTime: () => (ytReady && yt.getCurrentTime ? yt.getCurrentTime() : null),
       addFiles, removeSong, onChange: (f) => listeners.push(f),

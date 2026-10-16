@@ -1,8 +1,18 @@
 # Kurdistan Monopoly
 
-A Monopoly-style board game set across Kurdistan — Bashur (Iraq), Rojava (Syria),
-Rojhelat (Iran) and Bakur (Turkey). Plays entirely in your browser, on one
-computer, passing the mouse between players (hot-seat). No install, no server.
+A Monopoly-style board game with two themes: **Kurdistan** — Bashur (Iraq),
+Rojava (Syria), Rojhelat (Iran) and Bakur (Turkey) — and **Persia**, the cities
+of Iran from the Caspian to the Gulf. Plays entirely in your browser, on one
+computer, passing the mouse between players (hot-seat). No install needed.
+
+## Themes
+
+Pick a theme on the start screen. Each theme is a single file in `themes/`
+that supplies the 40 squares, card decks, tokens, currency, colours, centre
+artwork, Google Maps and Wikipedia lookups, offline blurbs and a YouTube
+starter list; its photos live in `images/<theme>/`. To add a theme, copy
+`themes/persian.js`, change the data, add a `<script>` tag for it in
+`index.html`, and run `python3 images/build.py --theme <id> --fetch` for photos.
 
 ## Play
 
@@ -101,9 +111,10 @@ songs stream from YouTube or come from your own collection.
 
 - `index.html` – page structure
 - `style.css` – board and UI styling
-- `data.js` – squares, rents, card text
+- `themes/` – one data file per theme (squares, cards, tokens, places, blurbs)
+- `data.js` – theme loader
 - `audio.js` – sound effects, built-in soundtracks, song library
 - `serve.py` / `play.command` – local no-cache web server and launcher
-- `images/` – photo library for the place panel, with `build.py` to rebuild or refetch it
+- `images/<theme>/` – photo libraries for the place panel, with `images/build.py` to rebuild or refetch them
 - `music/` – optional folder for your own audio files and the playlist helper
 - `game.js` – rules engine and UI
