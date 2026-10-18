@@ -1,5 +1,5 @@
 #!/bin/bash
-# Double-click to play Kurdistan Monopoly.
+# Double-click to play Karwan.
 # Serves the game from a tiny local web server (serve.py) so YouTube music
 # works (YouTube refuses to play on pages opened straight from disk) and so the
 # browser never caches stale game files.

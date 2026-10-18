@@ -1,11 +1,11 @@
-// Kurdistan Monopoly — game engine + UI (hot-seat, local play)
+// Karwan — game engine + UI (hot-seat, local play)
 (() => {
   'use strict';
 
   const $ = (sel) => document.querySelector(sel);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmt = (n) => CURRENCY + Math.round(n).toLocaleString();
-  const SAVE_KEY = 'kurdistan-monopoly-save';
+  const SAVE_KEY = 'karwan-save';
   const JAIL = 10, GO_SALARY = 200, JAIL_FINE = 50;
 
   let state = null;
@@ -28,7 +28,7 @@
   }
   function chooseTheme(id) {
     applyTheme(id);
-    localStorage.setItem('kurdistan-monopoly-theme', id);
+    localStorage.setItem('karwan-theme', id);
     applyThemeToDom();
     setupTokens.length = 0;
     renderPlayerRows();
@@ -52,7 +52,7 @@
       try {
         state = JSON.parse(localStorage.getItem(SAVE_KEY));
         applyTheme(state.theme || 'kurdish');
-        localStorage.setItem('kurdistan-monopoly-theme', THEME.id);
+        localStorage.setItem('karwan-theme', THEME.id);
         applyThemeToDom();
         startGameScreen();
       } catch (e) {
@@ -298,7 +298,7 @@
     else if (s.type === 'tax') note = `Pay ${fmt(s.amount)}`;
     else if (s.type === 'chance') note = `Draw a ${THEME.chance.name} card`;
     else if (s.type === 'chest') note = `Draw a ${THEME.chest.name} card`;
-    else if (s.type === 'gotojail') note = 'Straight to jail!';
+    else if (s.type === 'gotojail') note = 'Stopped at the checkpoint — straight to jail!';
     else if (s.type === 'parking') note = state.opts.parking && state.pot ? `Collect the ${fmt(state.pot)} pot` : 'Free rest';
     else if (s.type === 'jail') note = 'Just visiting';
     else if (s.type === 'go') note = `Collect ${fmt(GO_SALARY)}`;
@@ -372,13 +372,13 @@
         const icon = s.type === 'railroad' ? ICONS.railroad : (s.name.includes('Power') ? '⚡' : '💧');
         body = `<div class="body"><div class="${nameCls}">${s.name}</div><div class="icon">${icon}</div><div class="price">${fmt(s.price)}</div></div>`;
       } else if (s.type === 'tax') {
-        body = `<div class="body"><div class="name">${s.name}</div><div class="icon">${ICONS.tax}</div><div class="price">Pay ${fmt(s.amount)}</div></div>`;
+        body = `<div class="body"><div class="${nameCls}">${s.name}</div><div class="icon">${ICONS.tax}</div><div class="price">Pay ${fmt(s.amount)}</div></div>`;
       } else if (s.type === 'chance' || s.type === 'chest') {
         body = `<div class="body"><div class="name">${s.name}</div><div class="icon">${ICONS[s.type]}</div><div class="kname">${s.type === 'chance' ? THEME.chance.sub : THEME.chest.sub}</div></div>`;
       } else if (s.type === 'go') {
         body = `<div class="body"><div class="kname">Collect ${fmt(GO_SALARY)}</div><div class="name">GO</div><div class="icon">${ICONS.go}</div><div class="kname">${s.kurdish}</div></div>`;
       } else {
-        body = `<div class="body"><div class="name">${s.name}</div><div class="icon">${ICONS[s.type]}</div><div class="kname">${s.kurdish || ''}</div></div>`;
+        body = `<div class="body"><div class="${corner ? 'name' : nameCls}">${s.name}</div><div class="icon">${ICONS[s.type]}</div><div class="kname">${s.kurdish || ''}</div></div>`;
       }
       el.innerHTML = body + `<div class="owner-tag"></div>${['property', 'railroad', 'utility'].includes(s.type) ? '<div class="owner-strip"></div>' : ''}<div class="tokens"></div>`;
       el.onclick = () => showSquareInfo(i);
@@ -463,11 +463,11 @@
   }
 
   // ---------- Place panel (photo + story, left side) ----------
-  const wikiCache = JSON.parse(localStorage.getItem('kurdistan-monopoly-wiki') || '{}');
+  const wikiCache = JSON.parse(localStorage.getItem('karwan-wiki') || '{}');
   let placeToken = 0;
   function placePanelVisible() { const p = $('#place-panel'); return p && getComputedStyle(p).display !== 'none'; }
   // ---------- Collapsible side panels ----------
-  const UI_KEY = 'kurdistan-monopoly-ui';
+  const UI_KEY = 'karwan-ui';
   const ui = Object.assign({ leftCollapsed: false, rightCollapsed: false }, JSON.parse(localStorage.getItem(UI_KEY) || '{}'));
   function applyPanels() {
     $('#game').classList.toggle('left-collapsed', ui.leftCollapsed);
@@ -493,11 +493,11 @@
     const sources = [...new Set([large, small, original].filter(Boolean))];
     const entry = { extract: j.extract || '', thumb: sources[0] || null, sources, page: (j.content_urls && j.content_urls.desktop && j.content_urls.desktop.page) || wikiUrl(name), title: j.title };
     wikiCache[title] = entry;
-    try { localStorage.setItem('kurdistan-monopoly-wiki', JSON.stringify(wikiCache)); } catch (e) { /* storage full — fine */ }
+    try { localStorage.setItem('karwan-wiki', JSON.stringify(wikiCache)); } catch (e) { /* storage full — fine */ }
     return entry;
   }
   // Optional: photo gallery through Google's Custom Search JSON API (user supplies a free key)
-  const GOOGLE_KEY = 'kurdistan-monopoly-google';
+  const GOOGLE_KEY = 'karwan-google';
   const googleCfg = () => JSON.parse(localStorage.getItem(GOOGLE_KEY) || 'null');
   const googleCache = JSON.parse(localStorage.getItem(GOOGLE_KEY + '-cache') || '{}');
   async function fetchGooglePhotos(name) {
@@ -650,8 +650,8 @@
     const desc = {
       go: `Collect ${fmt(GO_SALARY)} salary each time you pass GO.`,
       jail: 'Just visiting — unless you were sent here!',
-      parking: state.opts.parking ? `Land here to collect the pot. Currently ${fmt(state.pot)}.` : 'A free rest in the mountains.',
-      gotojail: 'Go directly to Jail. Do not pass GO.',
+      parking: state.opts.parking ? `Land here to collect the pot. Currently ${fmt(state.pot)}.` : 'A free rest — nothing happens here.',
+      gotojail: 'Stopped at the checkpoint: go directly to Jail. Do not pass GO.',
       tax: `Pay ${fmt(s.amount || 0)} to the bank.`,
       chance: `Draw a ${THEME.chance.name} card.`,
       chest: `Draw a ${THEME.chest.name} card.`,
@@ -1003,7 +1003,7 @@
       }
       case 'tax': {
         log(`${p.name} pays ${fmt(s.amount)} ${s.name.toLowerCase()}.`);
-        await notify(s.name, `<p>Pay <b>${fmt(s.amount)}</b> to the bank${state.opts.parking ? ' (goes to the Free Parking pot)' : ''}.</p>`, 'Pay');
+        await notify(s.name, `<p>Pay <b>${fmt(s.amount)}</b> to the bank${state.opts.parking ? ' (goes to the rest-stop pot)' : ''}.</p>`, 'Pay');
         if (charge(pi, s.amount, null, { toPot: true })) Audio_.play('pay');
         return;
       }
@@ -1012,10 +1012,10 @@
       case 'gotojail': return sendToJail(pi);
       case 'parking': {
         if (state.opts.parking && state.pot > 0) {
-          log(`${p.name} collects the ${fmt(state.pot)} Free Parking pot!`, true);
+          log(`${p.name} collects the ${fmt(state.pot)} pot at ${s.name}!`, true);
           p.money += state.pot;
           Audio_.play('cash');
-          await notify('Newroz Picnic', `<p>${p.name} collects the Free Parking pot of <b>${fmt(state.pot)}</b>!</p>`);
+          await notify(s.name, `<p>${p.name} collects the pot of <b>${fmt(state.pot)}</b>!</p>`);
           state.pot = 0;
         }
         return;

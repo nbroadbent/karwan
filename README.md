@@ -1,9 +1,13 @@
-# Kurdistan Monopoly
+# Karwan · کاروان
 
-A Monopoly-style board game with two themes: **Kurdistan** — Bashur (Iraq),
-Rojava (Syria), Rojhelat (Iran) and Bakur (Turkey) — and **Persia**, the cities
-of Iran from the Caspian to the Gulf. Plays entirely in your browser, on one
+*The Silk Road trading game.* Lead your caravan from city to city, buying,
+building and trading, in two themes: **Kurdistan** — Bashur (Iraq), Rojava
+(Syria), Rojhelat (Iran) and Bakur (Turkey) — and **Persia**, the cities of
+Iran from the Caspian to the Gulf. Plays entirely in your browser, on one
 computer, passing the mouse between players (hot-seat). No install needed.
+
+Karwan is an original property-trading game. It is not affiliated with or
+endorsed by Hasbro, and is not Monopoly.
 
 ## Themes
 
@@ -64,8 +68,10 @@ the tab and pick it up later from the start screen.
 | Green | Cities | Hasakah, Kirkuk, Sulaymaniyah |
 | Dark blue | Capitals | Diyarbakir (Amed), Erbil (Hewlêr) |
 
-Border crossings (Ibrahim Khalil, Semalka, Haji Omaran, Bashmaq) take the place
-of railroads. Dukan Dam Power and Tigris Waterworks are the utilities.
+Border crossings (Ibrahim Khalil, Semalka, Haji Omaran, Bashmaq) are the travel
+squares. Dukan Dam Power and Tigris Waterworks are the utilities. Corners are
+GO, Jail, the Newroz Picnic rest stop and the Checkpoint; taxes are Customs Duty
+and the Bazaar Levy.
 Chance cards are **Newroz** cards and Community Chest cards are **Dîwan** cards.
 Currency is the dinar (Ð).
 

@@ -1,4 +1,4 @@
-// Kurdistan Monopoly — audio: synthesized sound effects, a jukebox of
+// Karwan — audio: synthesized sound effects, a jukebox of
 // built-in Kurdish-style soundtracks, and a library of the player's own songs.
 //
 // Built-in tracks are synthesized with the Web Audio API in traditional Kurdish
@@ -6,9 +6,9 @@
 // Real recordings can be added from local files; they are kept in IndexedDB so
 // they survive reloads, or listed in music/playlist.js.
 const Audio_ = (() => {
-  const PREF_KEY = 'kurdistan-monopoly-audio';
+  const PREF_KEY = 'karwan-audio';
   const prefs = Object.assign({ sfx: true, music: true, track: 'govend', volume: 0.6 }, JSON.parse(localStorage.getItem(PREF_KEY) || '{}'));
-  const YT_KEY = 'kurdistan-monopoly-youtube';
+  const YT_KEY = 'karwan-youtube';
   let ctx = null, master, sfxGain, musicGain;
   const listeners = [];
   function savePrefs() { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); }
@@ -253,15 +253,32 @@ const Audio_ = (() => {
   // =====================================================================
   let userSongs = []; // { id, name, url, source: 'library' | 'folder' }
   let db = null;
-  function openDb() {
+  function openNamedDb(name) {
     return new Promise((resolve) => {
-      if (db) return resolve(db);
-      if (!window.indexedDB) return resolve(null);
-      const req = indexedDB.open('kurdistan-monopoly', 1);
+      const req = indexedDB.open(name, 1);
       req.onupgradeneeded = () => req.result.createObjectStore('songs', { keyPath: 'id' });
-      req.onsuccess = () => { db = req.result; resolve(db); };
+      req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
     });
+  }
+  async function openDb() {
+    if (db) return db;
+    if (!window.indexedDB) return null;
+    db = await openNamedDb('karwan');
+    // one-time migration of songs saved under the game's old name
+    try {
+      const dbs = indexedDB.databases ? await indexedDB.databases() : [];
+      if (db && dbs.some((d) => d.name === 'kurdistan-monopoly')) {
+        const old = await openNamedDb('kurdistan-monopoly');
+        if (old) {
+          const rows = await new Promise((resolve) => { const r = old.transaction('songs').objectStore('songs').getAll(); r.onsuccess = () => resolve(r.result || []); r.onerror = () => resolve([]); });
+          await new Promise((resolve) => { const tx = db.transaction('songs', 'readwrite'); rows.forEach((row) => tx.objectStore('songs').put(row)); tx.oncomplete = resolve; tx.onerror = resolve; });
+          old.close();
+          indexedDB.deleteDatabase('kurdistan-monopoly');
+        }
+      }
+    } catch (e) { /* migration is best-effort */ }
+    return db;
   }
   async function loadUserSongs() {
     userSongs.forEach((s) => s.source === 'library' && URL.revokeObjectURL(s.url));

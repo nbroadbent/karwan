@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the local photo library for Kurdistan Monopoly.
+"""Build the local photo library for Karwan.
 
   python3 images/build.py --theme kurdish            rebuild images/kurdish/manifest.js from the files in that folder
   python3 images/build.py --theme persian --fetch    also download freely licensed photos from Wikimedia Commons
@@ -19,7 +19,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 THEME = (sys.argv[sys.argv.index('--theme') + 1] if '--theme' in sys.argv else 'kurdish')
 HERE = os.path.join(ROOT, THEME)
 os.makedirs(HERE, exist_ok=True)
-UA = {'User-Agent': 'KurdistanMonopoly/1.0 (local hobby board game; images/build.py)'}
+UA = {'User-Agent': 'Karwan/1.0 (local hobby board game; images/build.py)'}
 MAX_PER_PLACE = 3
 WIDTH = 900
 SKIP = re.compile(r'map|flag|locator|coat|arms|logo|seal|icon|emblem|banner|chart|diagram|graph|wappen|karte|\.svg$|\.gif$|\.png$|\.tif', re.I)
