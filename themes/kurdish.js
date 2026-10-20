@@ -1,10 +1,10 @@
-// Karwan · Kurdistan theme — places across Bashur (Iraq), Rojava (Syria), Rojhelat (Iran) and Bakur (Turkey)
+// Pazar · Kurdistan theme — places across Bashur (Iraq), Rojava (Syria), Rojhelat (Iran) and Bakur (Turkey)
 window.THEMES = window.THEMES || {};
 THEMES.kurdish = {
   id: 'kurdish',
   name: 'Kurdistan',
-  title: 'Karwan: Kurdistan',
-  tagline: 'Lead your caravan across Bashur, Rojava, Rojhelat and Bakur — buy, build and trade.',
+  title: 'Pazar: Kurdistan',
+  tagline: 'Buy, build and trade your way across Bashur, Rojava, Rojhelat and Bakur.',
   discover: 'Discover Kurdistan',
   discoverText: 'Click any square on the board to see a photo and the story of that place. The panel also follows each player as they land.',
   winText: 'rules Kurdistan!',
@@ -13,7 +13,7 @@ THEMES.kurdish = {
   chance: { name: 'Newroz', sub: 'Chance', icon: '🔥', colors: ['#ed2024', '#f28c28'] },
   chest: { name: 'Dîwan', sub: 'Community', icon: '🪔', colors: ['#278e43', '#1d3f8f'] },
   icons: { parking: '🌳', gotojail: '👮', jail: '🔒', railroad: '🛂', tax: '💰', go: '➜' },
-  center: { title: 'Kurdistan', script: 'کوردستان', subtitle: 'KARWAN · کاروان', emblem: 'sun',
+  center: { title: 'Kurdistan', script: 'کوردستان', subtitle: 'PAZAR · بازار', emblem: 'sun',
     bands: 'linear-gradient(180deg, #ed2024 0 33.3%, #fff 33.3% 66.6%, #278e43 66.6% 100%)',
     mountains: { back: '#1d6a33', front: '#154f26', snow: '#fff' } },
   tokens: ['☀️', '🦅', '🐎', '🌹', '🏔️', '🫖', '🎻', '🐑'],

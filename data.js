@@ -1,13 +1,12 @@
-// Karwan — theme loader.
+// Pazar — theme loader.
 // Each theme (themes/*.js) supplies its board, cards, tokens, currency, places,
 // Wikipedia titles and blurbs. applyTheme() exposes the active theme's tables
 // as the globals the game engine uses.
 
-// One-time migration of settings and saved games from the game's old name.
+// One-time migration of settings and saved games from the game's earlier names.
 (function migrateStorage() {
-  const map = { 'kurdistan-monopoly-save': 'karwan-save', 'kurdistan-monopoly-audio': 'karwan-audio', 'kurdistan-monopoly-youtube': 'karwan-youtube',
-    'kurdistan-monopoly-google': 'karwan-google', 'kurdistan-monopoly-google-cache': 'karwan-google-cache', 'kurdistan-monopoly-ui': 'karwan-ui',
-    'kurdistan-monopoly-theme': 'karwan-theme', 'kurdistan-monopoly-wiki': 'karwan-wiki' };
+  const map = {};
+  for (const k of ['save', 'audio', 'youtube', 'google', 'google-cache', 'ui', 'theme', 'wiki']) { map['kurdistan-monopoly-' + k] = 'pazar-' + k; map['karwan-' + k] = 'pazar-' + k; }
   try {
     for (const [oldKey, newKey] of Object.entries(map)) {
       let v = localStorage.getItem(oldKey);
@@ -48,4 +47,4 @@ const mapUrl = (name) => (MAP_PLACES[name] ? 'https://www.google.com/maps/search
 const googleImagesUrl = (name) => 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent((MAP_PLACES[name] || name) + ' ' + THEME.name);
 const wikiUrl = (name) => (WIKI_TITLES[name] ? 'https://en.wikipedia.org/wiki/' + encodeURIComponent(WIKI_TITLES[name].replace(/ /g, '_')) : null);
 
-applyTheme(localStorage.getItem('karwan-theme') || 'kurdish');
+applyTheme(localStorage.getItem('pazar-theme') || 'kurdish');

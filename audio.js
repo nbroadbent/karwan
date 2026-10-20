@@ -1,4 +1,4 @@
-// Karwan — audio: synthesized sound effects, a jukebox of
+// Pazar — audio: synthesized sound effects, a jukebox of
 // built-in Kurdish-style soundtracks, and a library of the player's own songs.
 //
 // Built-in tracks are synthesized with the Web Audio API in traditional Kurdish
@@ -6,9 +6,9 @@
 // Real recordings can be added from local files; they are kept in IndexedDB so
 // they survive reloads, or listed in music/playlist.js.
 const Audio_ = (() => {
-  const PREF_KEY = 'karwan-audio';
+  const PREF_KEY = 'pazar-audio';
   const prefs = Object.assign({ sfx: true, music: true, track: 'govend', volume: 0.6 }, JSON.parse(localStorage.getItem(PREF_KEY) || '{}'));
-  const YT_KEY = 'karwan-youtube';
+  const YT_KEY = 'pazar-youtube';
   let ctx = null, master, sfxGain, musicGain;
   const listeners = [];
   function savePrefs() { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); }
@@ -264,17 +264,18 @@ const Audio_ = (() => {
   async function openDb() {
     if (db) return db;
     if (!window.indexedDB) return null;
-    db = await openNamedDb('karwan');
-    // one-time migration of songs saved under the game's old name
+    db = await openNamedDb('pazar');
+    // one-time migration of songs saved under the game's earlier names
     try {
       const dbs = indexedDB.databases ? await indexedDB.databases() : [];
-      if (db && dbs.some((d) => d.name === 'kurdistan-monopoly')) {
-        const old = await openNamedDb('kurdistan-monopoly');
+      for (const oldName of ['karwan', 'kurdistan-monopoly']) {
+        if (!db || !dbs.some((d) => d.name === oldName)) continue;
+        const old = await openNamedDb(oldName);
         if (old) {
           const rows = await new Promise((resolve) => { const r = old.transaction('songs').objectStore('songs').getAll(); r.onsuccess = () => resolve(r.result || []); r.onerror = () => resolve([]); });
           await new Promise((resolve) => { const tx = db.transaction('songs', 'readwrite'); rows.forEach((row) => tx.objectStore('songs').put(row)); tx.oncomplete = resolve; tx.onerror = resolve; });
           old.close();
-          indexedDB.deleteDatabase('kurdistan-monopoly');
+          indexedDB.deleteDatabase(oldName);
         }
       }
     } catch (e) { /* migration is best-effort */ }

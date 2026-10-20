@@ -1,10 +1,10 @@
-// Karwan · Persia theme — cities of Iran, Silk Road caravanserais, Nowruz and Bazaar cards
+// Pazar · Persia theme — cities of Iran, Silk Road caravanserais, Nowruz and Bazaar cards
 window.THEMES = window.THEMES || {};
 THEMES.persian = {
   id: 'persian',
   name: 'Persia',
-  title: 'Karwan: Persia',
-  tagline: 'Lead your caravan along the Silk Road from the Caspian shore to the Persian Gulf.',
+  title: 'Pazar: Persia',
+  tagline: 'Trade your way along the Silk Road from the Caspian shore to the Persian Gulf.',
   discover: 'Discover Persia',
   discoverText: 'Click any square on the board to see a photo and the story of that place. The panel also follows each player as they land.',
   winText: 'rules all of Persia!',
@@ -13,7 +13,7 @@ THEMES.persian = {
   chance: { name: 'Nowruz', sub: 'Chance', icon: '🌷', colors: ['#c0392b', '#e0b341'] },
   chest: { name: 'Bazaar', sub: 'Community', icon: '🏺', colors: ['#0f7b6c', '#1b3b8a'] },
   icons: { parking: '🫖', gotojail: '👮', jail: '🔒', railroad: '🐪', tax: '💰', go: '➜' },
-  center: { title: 'Persia', script: 'ایران', subtitle: 'KARWAN · کاروان', emblem: 'star',
+  center: { title: 'Persia', script: 'ایران', subtitle: 'PAZAR · بازار', emblem: 'star',
     bands: 'radial-gradient(circle at 50% 45%, #24509e 0, #1b3b8a 55%, #142c6b 100%)',
     mountains: { back: '#2f5aa8', front: '#1a3a7d', snow: '#fff' } },
   tokens: ['🐈', '🐆', '🌹', '🫖', '🏺', '🌷', '🪁', '🦚'],

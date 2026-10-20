@@ -1,5 +1,5 @@
 #!/bin/bash
-# Double-click to play Karwan.
+# Double-click to play Pazar.
 # Serves the game from a tiny local web server (serve.py) so YouTube music
 # works (YouTube refuses to play on pages opened straight from disk) and so the
 # browser never caches stale game files.

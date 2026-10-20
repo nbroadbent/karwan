@@ -1,11 +1,11 @@
-// Karwan — game engine + UI (hot-seat, local play)
+// Pazar — game engine + UI (hot-seat, local play)
 (() => {
   'use strict';
 
   const $ = (sel) => document.querySelector(sel);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmt = (n) => CURRENCY + Math.round(n).toLocaleString();
-  const SAVE_KEY = 'karwan-save';
+  const SAVE_KEY = 'pazar-save';
   const JAIL = 10, GO_SALARY = 200, JAIL_FINE = 50;
 
   let state = null;
@@ -28,7 +28,7 @@
   }
   function chooseTheme(id) {
     applyTheme(id);
-    localStorage.setItem('karwan-theme', id);
+    localStorage.setItem('pazar-theme', id);
     applyThemeToDom();
     setupTokens.length = 0;
     renderPlayerRows();
@@ -52,7 +52,7 @@
       try {
         state = JSON.parse(localStorage.getItem(SAVE_KEY));
         applyTheme(state.theme || 'kurdish');
-        localStorage.setItem('karwan-theme', THEME.id);
+        localStorage.setItem('pazar-theme', THEME.id);
         applyThemeToDom();
         startGameScreen();
       } catch (e) {
@@ -463,11 +463,11 @@
   }
 
   // ---------- Place panel (photo + story, left side) ----------
-  const wikiCache = JSON.parse(localStorage.getItem('karwan-wiki') || '{}');
+  const wikiCache = JSON.parse(localStorage.getItem('pazar-wiki') || '{}');
   let placeToken = 0;
   function placePanelVisible() { const p = $('#place-panel'); return p && getComputedStyle(p).display !== 'none'; }
   // ---------- Collapsible side panels ----------
-  const UI_KEY = 'karwan-ui';
+  const UI_KEY = 'pazar-ui';
   const ui = Object.assign({ leftCollapsed: false, rightCollapsed: false }, JSON.parse(localStorage.getItem(UI_KEY) || '{}'));
   function applyPanels() {
     $('#game').classList.toggle('left-collapsed', ui.leftCollapsed);
@@ -493,11 +493,11 @@
     const sources = [...new Set([large, small, original].filter(Boolean))];
     const entry = { extract: j.extract || '', thumb: sources[0] || null, sources, page: (j.content_urls && j.content_urls.desktop && j.content_urls.desktop.page) || wikiUrl(name), title: j.title };
     wikiCache[title] = entry;
-    try { localStorage.setItem('karwan-wiki', JSON.stringify(wikiCache)); } catch (e) { /* storage full — fine */ }
+    try { localStorage.setItem('pazar-wiki', JSON.stringify(wikiCache)); } catch (e) { /* storage full — fine */ }
     return entry;
   }
   // Optional: photo gallery through Google's Custom Search JSON API (user supplies a free key)
-  const GOOGLE_KEY = 'karwan-google';
+  const GOOGLE_KEY = 'pazar-google';
   const googleCfg = () => JSON.parse(localStorage.getItem(GOOGLE_KEY) || 'null');
   const googleCache = JSON.parse(localStorage.getItem(GOOGLE_KEY + '-cache') || '{}');
   async function fetchGooglePhotos(name) {

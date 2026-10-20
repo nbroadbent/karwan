@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tiny local web server for Karwan.
+"""Tiny local web server for Pazar.
 
 Serves the game folder on localhost (needed for YouTube music) and tells the
 browser never to cache game files, so a reload always picks up the latest
@@ -26,5 +26,5 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     with ThreadingHTTPServer(('127.0.0.1', PORT), NoCacheHandler) as httpd:
-        print(f'Karwan at http://localhost:{PORT}/')
+        print(f'Pazar at http://localhost:{PORT}/')
         httpd.serve_forever()
